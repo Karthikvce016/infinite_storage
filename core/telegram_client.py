@@ -10,13 +10,15 @@ the target loop.
 """
 
 import logging
+import os
 from typing import Optional
 
 from telethon import TelegramClient
+from telethon.sessions import StringSession
 from telethon.tl.functions.channels import CreateChannelRequest
 from telethon.tl.types import Channel
 
-from config.settings import API_ID, API_HASH, SESSION_NAME, CHANNEL_NAME, APP_DIR
+from config.settings import API_ID, API_HASH, CHANNEL_NAME
 
 log = logging.getLogger(__name__)
 
@@ -35,9 +37,14 @@ class TelegramDriveClient:
         """
         Instantiate the Telethon client *and* connect, from within the
         asyncio loop that will be used for all future operations.
+
+        Uses a StringSession loaded from the SESSION_STRING env var
+        so no .session file is needed on disk.
         """
-        session_path = str(APP_DIR / SESSION_NAME)
-        self.client = TelegramClient(session_path, API_ID, API_HASH)
+        session_string = os.getenv("SESSION_STRING", "")
+        self.client = TelegramClient(
+            StringSession(session_string), API_ID, API_HASH
+        )
         await self.client.connect()
 
     async def disconnect(self) -> None:
