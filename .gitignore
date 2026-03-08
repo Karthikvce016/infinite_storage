@@ -2,6 +2,5 @@ venv/
 .venv/
 __pycache__/
 *.pyc
-*.session
 .env
 .DS_Store

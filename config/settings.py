@@ -28,8 +28,10 @@ CHANNEL_NAME: str = os.getenv("CHANNEL_NAME", "TelegramDriveStorage")
 # ──────────────────────────────────────────────
 # Paths
 # ──────────────────────────────────────────────
-APP_DIR: Path = Path.home() / ".telegram_drive"
-APP_DIR.mkdir(parents=True, exist_ok=True)
+# Project root = parent of config/
+_PROJECT_ROOT: Path = Path(__file__).resolve().parent.parent
+
+APP_DIR: Path = _PROJECT_ROOT
 
 DB_PATH: Path = APP_DIR / "index.db"
 DEFAULT_SYNC_FOLDER: Path = Path.home() / "TelegramDrive"
