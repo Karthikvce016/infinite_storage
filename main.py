@@ -33,7 +33,8 @@ def main() -> None:
         print(
             "\n⚠  Telegram API credentials missing.\n"
             "   1. Visit https://my.telegram.org and create an application.\n"
-            "   2. Set API_ID and API_HASH in config/settings.py.\n"
+            "   2. Copy .env.example to .env and fill in API_ID and API_HASH.\n"
+            "      Or set them as environment variables on your deployment platform.\n"
         )
         sys.exit(1)
 

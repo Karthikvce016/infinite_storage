@@ -1,6 +1,6 @@
 # Telegram Drive
 
-A desktop application that provides Google-Drive-like folder synchronization using a private Telegram channel as encrypted backend storage.
+A web application that provides Google-Drive-like file storage using a private Telegram channel as encrypted backend storage.
 
 ## Features
 
@@ -8,25 +8,29 @@ A desktop application that provides Google-Drive-like folder synchronization usi
 - **Automatic chunking** — large files are split into ≤ 1.9 GB chunks to respect Telegram limits
 - **Parallel uploads** — chunks are uploaded concurrently (semaphore-limited) for speed
 - **Two-step upload optimisation** — `upload_file()` + `send_file()` for faster throughput
-- **watchdog folder monitoring** — creation, modification, deletion, and rename events
 - **SHA-256 change detection** — only changed files are re-uploaded
 - **SQLite index** — maps local files to Telegram message IDs
 - **Restore system** — download, merge, and decrypt all files on a new machine
 - **FloodWait handling** — automatic sleep & retry on Telegram rate limits
-- **Dark-themed PyQt6 UI** — progress bar, file list, storage stats
+- **FastAPI Web Backend** — REST API with upload, download, list, and delete endpoints
+- **Responsive Web UI** — works on desktop and mobile browsers
 
 ## Project Structure
-
-Use a project root folder **without spaces** (e.g. `infinite_storage`). If your folder is named with spaces, rename it for reliable Python imports.
 
 ```
 infinite_storage/
 ├── main.py
 ├── requirements.txt
+├── Procfile
+├── .env.example
 ├── README.md
+├── api/
+│   ├── __init__.py
+│   ├── server.py          # FastAPI app setup & static file mount
+│   └── routes.py          # REST endpoints
 ├── config/
 │   ├── __init__.py
-│   └── settings.py        # API_ID, API_HASH, paths, etc.
+│   └── settings.py        # Env-var driven configuration
 ├── core/
 │   ├── __init__.py
 │   ├── telegram_client.py
@@ -36,14 +40,14 @@ infinite_storage/
 │   ├── crypto_manager.py
 │   ├── file_watcher.py
 │   └── sync_manager.py
+├── frontend/
+│   ├── index.html
+│   ├── upload.js
+│   └── styles.css
 ├── storage/
 │   ├── __init__.py
 │   └── database.py
-└── ui/
-    ├── __init__.py
-    ├── main_window.py     # Main window & drop zone
-    ├── dialogs.py         # Login, passphrase dialogs
-    └── styles.py          # Stylesheet & theme constants
+└── ui/                    # Legacy desktop UI (not used by web backend)
 ```
 
 ## Setup
@@ -63,43 +67,62 @@ source venv/bin/activate   # On Windows: venv\Scripts\activate
 pip install -r requirements.txt
 ```
 
-### 3. Configure
+### 3. Configure Environment Variables
 
-Open `config/settings.py` and set your credentials:
+Copy the example file and fill in your credentials:
 
-```python
-API_ID  = 12345678          # your api_id
-API_HASH = "abcdef1234..."  # your api_hash
+```bash
+cp .env.example .env
 ```
 
-### 4. Run
+Then edit `.env`:
 
-From the `infinite_storage` directory:
+```
+API_ID=12345678
+API_HASH=your_api_hash_here
+CHANNEL_NAME=TelegramDriveStorage
+SESSION_NAME=telegram_drive_session
+```
+
+| Variable        | Required | Description                                       |
+|-----------------|----------|---------------------------------------------------|
+| `API_ID`        | ✅       | Telegram API ID from https://my.telegram.org      |
+| `API_HASH`      | ✅       | Telegram API Hash                                  |
+| `CHANNEL_NAME`  | No       | Channel name for storage (default: `TelegramDriveStorage`) |
+| `SESSION_NAME`  | No       | Telethon session file name (default: `telegram_drive_session`) |
+| `PORT`          | No       | Server port (default: `8000`)                      |
+| `PASSPHRASE`    | No       | AES encryption passphrase                          |
+
+> **⚠ Never commit your `.env` file.** It is already listed in `.gitignore`.
+
+### 4. Run
 
 ```bash
 python main.py
 ```
 
-1. A login dialog appears — enter your Telegram phone number and the OTP code.
-2. Set an encryption passphrase (remember it — you need it to decrypt files).
-3. The main window opens. Click **Browse** to choose a sync folder, then **Start Sync**.
-4. Any file placed in the sync folder is automatically encrypted, chunked, and uploaded to a private channel called **TelegramDriveStorage**.
+Open <http://localhost:8000> in your browser to access the web UI.
 
-### 5. Restore on a new machine
+### 5. Deploy to Cloud (Railway / Render)
 
-1. Copy `~/.telegram_drive/index.db` and `~/.telegram_drive/salt.bin` to the new machine.
-2. Run `python main.py`, log in, enter the **same passphrase**.
-3. Click **Restore All** — files are downloaded, merged, and decrypted.
+1. Push your repository to GitHub.
+2. Connect the repository on your hosting platform.
+3. Set the required environment variables (`API_ID`, `API_HASH`, etc.) in the platform dashboard.
+4. The `Procfile` (`web: python main.py`) tells the platform how to start the app.
+5. The server automatically binds to the `PORT` provided by the platform.
 
 ## Libraries
 
-| Library        | Purpose                         |
-|----------------|----------------------------------|
-| telethon       | Telegram MTProto client          |
-| cryptography   | AES-256-GCM encryption          |
-| watchdog       | Filesystem event monitoring      |
-| PyQt6          | Desktop UI                       |
-| aiofiles       | Async file I/O                   |
-| sqlite3        | Local index database (stdlib)    |
-| hashlib        | SHA-256 hashing (stdlib)         |
-| asyncio        | Async orchestration (stdlib)     |
+| Library          | Purpose                         |
+|------------------|----------------------------------|
+| telethon         | Telegram MTProto client          |
+| cryptography     | AES-256-GCM encryption          |
+| watchdog         | Filesystem event monitoring      |
+| fastapi          | REST API framework               |
+| uvicorn          | ASGI server                      |
+| python-dotenv    | Load `.env` files                |
+| aiofiles         | Async file I/O                   |
+| sqlite3          | Local index database (stdlib)    |
+| hashlib          | SHA-256 hashing (stdlib)         |
+| asyncio          | Async orchestration (stdlib)     |
+

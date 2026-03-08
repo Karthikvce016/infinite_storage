@@ -1,22 +1,29 @@
 """
 settings.py – Central configuration constants for Telegram Drive.
 
-Replace API_ID and API_HASH with your own values from https://my.telegram.org.
+All sensitive values are loaded from environment variables.
+For local development, create a `.env` file in the project root
+(see `.env.example` for the required keys).
 """
 
+import os
 from pathlib import Path
+
+from dotenv import load_dotenv
+
+load_dotenv()
 
 # ──────────────────────────────────────────────
 # Telegram API credentials (REQUIRED)
 # ──────────────────────────────────────────────
-API_ID: int = 32544391            # <-- replace with your api_id
-API_HASH: str = "6d97d692d02fa60805dfac5cf39b8dc6"         # <-- replace with your api_hash
-SESSION_NAME: str = "telegram_drive_session"
+API_ID: int = int(os.getenv("API_ID", "0"))
+API_HASH: str = os.getenv("API_HASH", "")
+SESSION_NAME: str = os.getenv("SESSION_NAME", "telegram_drive_session")
 
 # ──────────────────────────────────────────────
 # Storage channel
 # ──────────────────────────────────────────────
-CHANNEL_NAME: str = "TelegramDriveStorage"
+CHANNEL_NAME: str = os.getenv("CHANNEL_NAME", "TelegramDriveStorage")
 
 # ──────────────────────────────────────────────
 # Paths
