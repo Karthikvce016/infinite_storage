@@ -31,7 +31,11 @@ CHANNEL_NAME: str = os.getenv("CHANNEL_NAME", "TelegramDriveStorage")
 # Project root = parent of config/
 _PROJECT_ROOT: Path = Path(__file__).resolve().parent.parent
 
-APP_DIR: Path = _PROJECT_ROOT
+# APP_DIR stores session, DB, salt, and temp files.
+# On Render: set APP_DATA_DIR=/var/data (persistent disk mount).
+# Locally:   defaults to the project root.
+APP_DIR: Path = Path(os.getenv("APP_DATA_DIR", str(_PROJECT_ROOT)))
+APP_DIR.mkdir(parents=True, exist_ok=True)
 
 DB_PATH: Path = APP_DIR / "index.db"
 DEFAULT_SYNC_FOLDER: Path = Path.home() / "TelegramDrive"
