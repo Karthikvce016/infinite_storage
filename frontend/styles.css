@@ -1,0 +1,236 @@
+:root {
+    --bg-color: #0d1117;
+    --text-color: #e6edf3;
+    --accent: #2f81f7;
+    --accent-hover: #1f5ed3;
+    --container-bg: #161b22;
+    --border: #30363d;
+    --row-hover: #1c2128;
+}
+
+body {
+    margin: 0;
+    padding: 0;
+    font-family: 'Inter', -apple-system, sans-serif;
+    background-color: var(--bg-color);
+    color: var(--text-color);
+}
+
+.container {
+    max-width: 900px;
+    margin: 0 auto;
+    padding: 2rem;
+}
+
+header {
+    text-align: center;
+    margin-bottom: 3rem;
+}
+
+header h1 {
+    font-size: 2.5rem;
+    margin-bottom: 0.5rem;
+    background: linear-gradient(to right, #2f81f7, #79c0ff);
+    -webkit-background-clip: text;
+    -webkit-text-fill-color: transparent;
+}
+
+header p {
+    color: #8b949e;
+}
+
+/* Upload Section */
+.upload-section {
+    margin-bottom: 3rem;
+}
+
+.upload-zone {
+    border: 2px dashed var(--border);
+    border-radius: 12px;
+    padding: 3rem 2rem;
+    text-align: center;
+    background-color: var(--container-bg);
+    cursor: pointer;
+    transition: all 0.2s ease;
+}
+
+.upload-zone:hover, .upload-zone.drag-over {
+    border-color: var(--accent);
+    background-color: rgba(47, 129, 247, 0.05);
+}
+
+.upload-content svg {
+    color: #8b949e;
+    margin-bottom: 1rem;
+}
+
+.upload-zone:hover .upload-content svg {
+    color: var(--accent);
+}
+
+.highlight {
+    color: var(--accent);
+    font-weight: 500;
+}
+
+/* Progress */
+#upload-progress-container {
+    margin-top: 1.5rem;
+    background-color: var(--container-bg);
+    padding: 1.5rem;
+    border-radius: 8px;
+    border: 1px solid var(--border);
+}
+
+.progress-bar-bg {
+    height: 8px;
+    background-color: var(--border);
+    border-radius: 4px;
+    overflow: hidden;
+    margin-bottom: 0.5rem;
+}
+
+.progress-bar-fill {
+    height: 100%;
+    background-color: var(--accent);
+    width: 0%;
+    transition: width 0.3s ease, background-color 0.3s ease;
+}
+
+#upload-status {
+    font-size: 0.9rem;
+    color: #8b949e;
+    margin: 0;
+}
+
+/* files list */
+.files-section h2 {
+    margin-bottom: 1rem;
+    font-size: 1.5rem;
+}
+
+.table-container {
+    background-color: var(--container-bg);
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    overflow: hidden;
+}
+
+table {
+    width: 100%;
+    border-collapse: collapse;
+}
+
+th, td {
+    padding: 1rem;
+    text-align: left;
+    border-bottom: 1px solid var(--border);
+}
+
+th {
+    background-color: rgba(255,255,255,0.02);
+    font-weight: 600;
+    color: #8b949e;
+}
+
+tbody tr:hover {
+    background-color: var(--row-hover);
+}
+
+tbody tr:last-child td {
+    border-bottom: none;
+}
+
+.hidden {
+    display: none !important;
+}
+
+#empty-state {
+    padding: 3rem;
+    text-align: center;
+    color: #8b949e;
+}
+
+/* Buttons */
+button {
+    cursor: pointer;
+    font-family: inherit;
+    font-weight: 500;
+    padding: 6px 14px;
+    border-radius: 6px;
+    border: 1px solid;
+    transition: all 0.2s ease;
+    font-size: 0.85rem;
+}
+
+.btn-download {
+    background-color: transparent;
+    color: var(--accent);
+    border-color: rgba(47, 129, 247, 0.4);
+    margin-right: 0.5rem;
+}
+
+.btn-download:hover {
+    background-color: rgba(47, 129, 247, 0.1);
+    border-color: var(--accent);
+}
+
+.btn-delete {
+    background-color: transparent;
+    color: #f85149;
+    border-color: rgba(248, 81, 73, 0.4);
+}
+
+.btn-delete:hover {
+    background-color: rgba(248, 81, 73, 0.1);
+    border-color: #f85149;
+}
+
+/* Mobile responsive */
+@media (max-width: 600px) {
+    .container {
+        padding: 1rem;
+    }
+    
+    table, thead, tbody, th, td, tr {
+        display: block;
+    }
+    
+    thead tr {
+        position: absolute;
+        top: -9999px;
+        left: -9999px;
+    }
+    
+    tr { border-bottom: 1px solid var(--border); padding: 1rem 0; }
+    
+    td {
+        border: none;
+        border-bottom: 0;
+        position: relative;
+        padding-left: 50%;
+        margin-bottom: 0.5rem;
+    }
+    
+    td:before {
+        position: absolute;
+        top: 0;
+        left: 1rem;
+        width: 45%;
+        padding-right: 10px;
+        white-space: nowrap;
+        color: #8b949e;
+        font-weight: 500;
+    }
+    
+    td:nth-of-type(1):before { content: "Name"; }
+    td:nth-of-type(2):before { content: "Size"; }
+    td:nth-of-type(3):before { content: "Actions"; }
+    
+    td.actions {
+        display: flex;
+        gap: 0.5rem;
+        padding-left: 1rem;
+        margin-top: 1rem;
+    }
+}

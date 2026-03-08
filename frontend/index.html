@@ -1,0 +1,61 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Telegram Drive</title>
+    <link rel="stylesheet" href="/styles.css">
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600&display=swap" rel="stylesheet">
+</head>
+<body>
+    <div class="container">
+        <header>
+            <h1>Telegram Drive</h1>
+            <p>Encrypted cloud storage powered by Telegram.</p>
+        </header>
+
+        <section class="upload-section">
+            <div class="upload-zone" id="drop-zone">
+                <input type="file" id="file-input" style="display: none;" multiple>
+                <div class="upload-content">
+                    <svg width="40" height="40" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                        <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path>
+                        <polyline points="17 8 12 3 7 8"></polyline>
+                        <line x1="12" y1="3" x2="12" y2="15"></line>
+                    </svg>
+                    <p>Drag & drop files here or <span class="highlight">browse</span></p>
+                </div>
+            </div>
+            <div id="upload-progress-container" class="hidden">
+                <div class="progress-bar-bg">
+                    <div class="progress-bar-fill" id="upload-progress-fill"></div>
+                </div>
+                <p id="upload-status">Uploading...</p>
+            </div>
+        </section>
+
+        <section class="files-section">
+            <h2>Your Files</h2>
+            <div class="table-container">
+                <table id="files-table">
+                    <thead>
+                        <tr>
+                            <th>Name</th>
+                            <th>Size</th>
+                            <th>Actions</th>
+                        </tr>
+                    </thead>
+                    <tbody id="files-tbody">
+                        <!-- File rows will be injected here via JS -->
+                    </tbody>
+                </table>
+                <div id="empty-state" class="hidden">
+                    <p>No files uploaded yet.</p>
+                </div>
+            </div>
+        </section>
+    </div>
+
+    <script src="/upload.js"></script>
+</body>
+</html>

@@ -1,0 +1,167 @@
+You are a senior Python architect. Refactor the current project structure to follow proper Python package conventions and fix architectural issues in the existing Telegram storage application.
+
+Current Problems to Fix:
+
+1. The project folder name contains spaces ("infinite storage").  
+2. Submodules may not be recognized as Python packages because they are missing init.py files.  
+3. The UI module is too large and should be split into multiple files.  
+4. The configuration file is placed directly in the root instead of a configuration module.  
+5. Imports may break if the project is treated as a proper Python package.
+
+Goal:
+Transform the project into a clean, scalable Python package with modular components.
+
+Required Final Structure:
+
+Rename the project root folder to:
+
+infinite_storage
+
+The final structure must look like this:
+
+infinite_storage/
+│
+├── main.py
+├── requirements.txt
+├── README.md
+│
+├── config/
+│   ├── init.py
+│   └── settings.py
+│
+├── core/
+│   ├── init.py
+│   ├── telegram_client.py
+│   ├── uploader.py
+│   ├── downloader.py
+│   ├── chunk_manager.py
+│   ├── crypto_manager.py
+│   └── sync_manager.py
+│
+├── storage/
+│   ├── init.py
+│   └── database.py
+│
+└── ui/
+    ├── init.py
+    ├── main_window.py
+    ├── dialogs.py
+    └── styles.py
+
+Changes That Must Be Applied:
+
+1. Rename Project Folder
+
+Rename:
+
+"infinite storage"
+
+to:
+
+"infinite_storage"
+
+Python packages must never contain spaces.
+
+2. Add Package Initializers
+
+Ensure each module directory contains:
+
+init.py
+
+Even if the file is empty.
+
+This allows Python to treat folders as importable packages.
+
+3. Move Configuration
+
+Move config.py into a dedicated configuration module:
+
+config/settings.py
+
+Example contents:
+
+API_ID = 123456
+API_HASH = "your_api_hash"
+CHANNEL_NAME = "TelegramDriveStorage"
+SYNC_FOLDER = "~/TelegramDrive"
+
+Update all imports accordingly:
+
+from config.settings import API_ID, API_HASH
+
+4. Split the UI Module
+
+The current ui.py file is too large. Split it into smaller components:
+
+main_window.py  
+Contains the primary PyQt application window.
+
+dialogs.py  
+Contains login dialogs, passphrase dialogs, and file selection dialogs.
+
+styles.py  
+Contains stylesheet definitions and UI styling constants.
+
+Update imports so the application loads the main window like this:
+
+from ui.main_window import MainWindow
+
+5. Fix Imports
+
+All imports must reference the new structure.
+
+Examples:
+
+Old import:
+
+from database import Database
+
+New import:
+
+from storage.database import Database
+
+
+Old import:
+
+from ui import LoginDialog
+
+New import:
+
+from ui.dialogs import LoginDialog
+
+
+Old import:
+
+from telegram_client import TelegramDriveClient
+
+New import:
+
+from core.telegram_client import TelegramDriveClient
+
+6. Keep Entry Point Clean
+
+main.py should only handle:
+
+- loading configuration
+- initializing the Telegram client
+- initializing the database
+- starting the PyQt application
+- launching the MainWindow
+
+The entry point should remain small and readable.
+
+7. Do Not Change Business Logic
+
+The refactor must NOT change:
+
+Telegram API behavior  
+Encryption logic  
+Chunking system  
+Upload logic  
+Database schema  
+
+Only improve structure and imports.
+
+8. Output Requirements
+
+Update folder structure, move files, and correct all import paths across the project so the application still runs correctly after the restructuring.
