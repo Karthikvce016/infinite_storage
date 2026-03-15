@@ -1,29 +1,26 @@
-import os
 import shutil
 from pathlib import Path
-from typing import List
+from typing import List, Optional
 
-from fastapi import APIRouter, UploadFile, File, Request, HTTPException, BackgroundTasks
+from fastapi import APIRouter, UploadFile, File, Form, Request, HTTPException, BackgroundTasks
 from fastapi.responses import JSONResponse, StreamingResponse
 
 from config.settings import TEMP_DIR
 from core.chunk_manager import compute_hash, split_file, merge_chunks, cleanup_chunks
-from core.crypto_manager import encrypt_file, decrypt_file
 from core.uploader import upload_chunks, delete_messages
 from core.downloader import download_chunks
 from storage.database import FileRecord
 
 router = APIRouter()
 
-# Read the passphrase from environment variable
-PASSPHRASE = os.getenv("PASSPHRASE", "default_secret_passphrase")
-from core.crypto_manager import derive_key
-KEY = derive_key(PASSPHRASE)
-
 
 @router.post("/upload")
-async def upload_file(request: Request, file: UploadFile = File(...)):
-    """Uploads a file to Telegram storage."""
+async def upload_file(
+    request: Request,
+    file: UploadFile = File(...),
+    alias: Optional[str] = Form(None),
+):
+    """Uploads a file to Telegram storage. Optionally accepts an alias name."""
     tg_client = request.app.state.tg_client
     db = request.app.state.db
 
@@ -36,7 +33,17 @@ async def upload_file(request: Request, file: UploadFile = File(...)):
         raise HTTPException(status_code=500, detail=f"Failed to save temporary file: {e}")
 
     file_size = temp_file_path.stat().st_size
-    rel_path = file.filename
+
+    # Use alias if provided, preserving the original file extension
+    if alias and alias.strip():
+        original_ext = Path(file.filename).suffix
+        alias_name = alias.strip()
+        # Add the original extension if the alias doesn't already have one
+        if not Path(alias_name).suffix:
+            alias_name += original_ext
+        rel_path = alias_name
+    else:
+        rel_path = file.filename
     new_hash = compute_hash(temp_file_path)
 
     try:
@@ -50,10 +57,8 @@ async def upload_file(request: Request, file: UploadFile = File(...)):
         if existing:
             await delete_messages(tg_client.client, channel, existing.msg_ids)
 
-        enc_path = TEMP_DIR / f"{temp_file_path.name}.enc"
-        encrypt_file(temp_file_path, enc_path, KEY)
-
-        chunk_paths = split_file(enc_path)
+        # Split raw file directly (no encryption)
+        chunk_paths = split_file(temp_file_path)
         msg_ids = await upload_chunks(tg_client.client, channel, chunk_paths)
 
         record = FileRecord(
@@ -70,8 +75,6 @@ async def upload_file(request: Request, file: UploadFile = File(...)):
     finally:
         # Cleanup temp local files
         cleanup_chunks(chunk_paths if 'chunk_paths' in locals() else [])
-        if 'enc_path' in locals():
-            enc_path.unlink(missing_ok=True)
         temp_file_path.unlink(missing_ok=True)
 
     return {"message": "File uploaded successfully", "file": {"name": rel_path, "size": file_size}}
@@ -107,21 +110,18 @@ async def download_file(file_id: str, request: Request, background_tasks: Backgr
         channel = await tg_client.ensure_channel()
         chunk_paths = await download_chunks(tg_client.client, channel, record.msg_ids)
 
-        merged_enc = TEMP_DIR / f"{Path(file_id).name}.enc"
-        merge_chunks(chunk_paths, merged_enc)
-
-        decrypted = TEMP_DIR / Path(file_id).name
-        decrypt_file(merged_enc, decrypted, KEY)
+        # Merge chunks directly to final file (no decryption)
+        merged = TEMP_DIR / Path(file_id).name
+        merge_chunks(chunk_paths, merged)
 
         cleanup_chunks(chunk_paths)
-        merged_enc.unlink(missing_ok=True)
 
         def file_iterator():
-            with open(decrypted, "rb") as f:
+            with open(merged, "rb") as f:
                 while chunk := f.read(8 * 1024 * 1024):
                     yield chunk
 
-        background_tasks.add_task(cleanup_file_task, decrypted)
+        background_tasks.add_task(cleanup_file_task, merged)
 
         return StreamingResponse(
             file_iterator(),

@@ -26,7 +26,6 @@ from PyQt6.QtCore import QThread, pyqtSignal
 
 from core.chunk_manager import compute_hash, split_file, merge_chunks, cleanup_chunks
 from config.settings import TEMP_DIR
-from core.crypto_manager import derive_key, encrypt_file, decrypt_file
 from storage.database import Database, FileRecord
 from core.downloader import download_chunks
 from core.file_watcher import FileWatcher
@@ -74,8 +73,6 @@ class SyncManager(QThread):
         self._db = db
         self._loop: Optional[asyncio.AbstractEventLoop] = None
         self._sync_folder: Optional[Path] = None
-        self._passphrase: str = ""
-        self._key: Optional[bytes] = None
         self._ready = False
 
         # File watcher
@@ -91,9 +88,7 @@ class SyncManager(QThread):
         self._sync_folder = folder
         folder.mkdir(parents=True, exist_ok=True)
 
-    def set_passphrase(self, passphrase: str) -> None:
-        self._passphrase = passphrase
-        self._key = derive_key(passphrase)
+
 
     # ------------------------------------------------------------------
     # QThread entry point
@@ -198,13 +193,10 @@ class SyncManager(QThread):
     # Download a single file to temp (user saves manually)
     # ------------------------------------------------------------------
     async def _download_single(self, db_path: str) -> None:
-        """Download one file's chunks, merge, decrypt to TEMP_DIR, then signal the UI."""
+        """Download one file's chunks, merge to TEMP_DIR, then signal the UI."""
         record = self._db.get_file(db_path)
         if record is None:
             self.error_occurred.emit(f"File not found in index: {db_path}")
-            return
-        if not self._key:
-            self.error_occurred.emit("Encryption key not set.")
             return
         try:
             self.status_update.emit(f"Downloading {db_path}…")
@@ -214,23 +206,17 @@ class SyncManager(QThread):
             chunk_paths = await download_chunks(self._tg.client, channel, record.msg_ids)
             self.progress_update.emit(60)
 
-            # Merge chunks
-            merged_enc = TEMP_DIR / f"{Path(db_path).name}.enc"
-            merge_chunks(chunk_paths, merged_enc)
-            self.progress_update.emit(80)
-
-            # Decrypt to temp
-            decrypted = TEMP_DIR / Path(db_path).name
-            decrypt_file(merged_enc, decrypted, self._key)
+            # Merge chunks directly to final file
+            merged = TEMP_DIR / Path(db_path).name
+            merge_chunks(chunk_paths, merged)
             self.progress_update.emit(100)
 
             # Cleanup intermediate files
             cleanup_chunks(chunk_paths)
-            merged_enc.unlink(missing_ok=True)
 
             self.status_update.emit(f"Downloaded {db_path} ✓  (choose where to save)")
             # Tell the UI so it can show a Save-As dialog
-            self.file_downloaded.emit(db_path, str(decrypted))
+            self.file_downloaded.emit(db_path, str(merged))
 
         except Exception as exc:
             log.exception("Download failed for %s", db_path)
@@ -240,13 +226,10 @@ class SyncManager(QThread):
     # Preview a file (download to temp, open with default app)
     # ------------------------------------------------------------------
     async def _preview_single(self, db_path: str) -> None:
-        """Download, decrypt to temp, then signal the UI to open with default viewer."""
+        """Download to temp, then signal the UI to open with default viewer."""
         record = self._db.get_file(db_path)
         if record is None:
             self.error_occurred.emit(f"File not found in index: {db_path}")
-            return
-        if not self._key:
-            self.error_occurred.emit("Encryption key not set.")
             return
         try:
             self.status_update.emit(f"Downloading {db_path} for preview…")
@@ -256,19 +239,14 @@ class SyncManager(QThread):
             chunk_paths = await download_chunks(self._tg.client, channel, record.msg_ids)
             self.progress_update.emit(60)
 
-            merged_enc = TEMP_DIR / f"{Path(db_path).name}.enc"
-            merge_chunks(chunk_paths, merged_enc)
-            self.progress_update.emit(80)
-
-            decrypted = TEMP_DIR / Path(db_path).name
-            decrypt_file(merged_enc, decrypted, self._key)
+            merged = TEMP_DIR / Path(db_path).name
+            merge_chunks(chunk_paths, merged)
             self.progress_update.emit(100)
 
             cleanup_chunks(chunk_paths)
-            merged_enc.unlink(missing_ok=True)
 
             self.status_update.emit(f"Opening {db_path} for preview…")
-            self.file_previewed.emit(db_path, str(decrypted))
+            self.file_previewed.emit(db_path, str(merged))
 
         except Exception as exc:
             log.exception("Preview failed for %s", db_path)
@@ -295,10 +273,6 @@ class SyncManager(QThread):
                 self.status_update.emit(f"Uploading {rel} ({idx}/{total})…")
                 self.progress_update.emit(0)
 
-                if not self._key:
-                    self.error_occurred.emit("Encryption key not set.")
-                    return
-
                 new_hash = compute_hash(file_path)
                 existing = self._db.get_file(rel)
 
@@ -310,13 +284,8 @@ class SyncManager(QThread):
                     channel = await self._tg.ensure_channel()
                     await delete_messages(self._tg.client, channel, existing.msg_ids)
 
-                self.status_update.emit(f"Encrypting {rel}…")
-                enc_path = TEMP_DIR / f"{file_path.name}.enc"
-                encrypt_file(file_path, enc_path, self._key)
-                self.progress_update.emit(20)
-
                 self.status_update.emit(f"Splitting {rel}…")
-                chunk_paths = split_file(enc_path)
+                chunk_paths = split_file(file_path)
                 self.progress_update.emit(30)
 
                 self.status_update.emit(f"Uploading {rel} ({len(chunk_paths)} chunk(s))…")
@@ -337,7 +306,6 @@ class SyncManager(QThread):
                 self.file_list_changed.emit()
 
                 cleanup_chunks(chunk_paths)
-                enc_path.unlink(missing_ok=True)
 
             except Exception as exc:
                 log.exception("Manual upload failed for %s", file_path)
@@ -372,7 +340,7 @@ class SyncManager(QThread):
         self.status_update.emit("Initial scan complete")
 
     async def _handle_upload(self, file_path: Path) -> None:
-        if not file_path.exists() or not self._sync_folder or not self._key:
+        if not file_path.exists() or not self._sync_folder:
             return
         # Skip hidden files
         if _is_hidden(file_path.name):
@@ -394,13 +362,8 @@ class SyncManager(QThread):
                 channel = await self._tg.ensure_channel()
                 await delete_messages(self._tg.client, channel, existing.msg_ids)
 
-            self.status_update.emit(f"Encrypting {rel}…")
-            enc_path = TEMP_DIR / f"{file_path.name}.enc"
-            encrypt_file(file_path, enc_path, self._key)
-            self.progress_update.emit(20)
-
             self.status_update.emit(f"Splitting {rel}…")
-            chunk_paths = split_file(enc_path)
+            chunk_paths = split_file(file_path)
             self.progress_update.emit(30)
 
             self.status_update.emit(f"Uploading {rel} ({len(chunk_paths)} chunk(s))…")
@@ -421,7 +384,6 @@ class SyncManager(QThread):
             self.file_list_changed.emit()
 
             cleanup_chunks(chunk_paths)
-            enc_path.unlink(missing_ok=True)
 
         except Exception as exc:
             log.exception("Upload failed for %s", file_path)
@@ -449,7 +411,7 @@ class SyncManager(QThread):
             self.error_occurred.emit(f"Delete failed: {exc}")
 
     async def _restore_all(self) -> None:
-        if not self._sync_folder or not self._key:
+        if not self._sync_folder:
             return
         records = self._db.get_all_files()
         total = len(records)
@@ -465,17 +427,14 @@ class SyncManager(QThread):
 
                 chunk_paths = await download_chunks(self._tg.client, channel, rec.msg_ids)
 
-                merged = TEMP_DIR / f"{Path(rec.path).name}.enc"
-                merge_chunks(chunk_paths, merged)
-
+                # Merge chunks directly to destination
                 dest.parent.mkdir(parents=True, exist_ok=True)
-                decrypt_file(merged, dest, self._key)
+                merge_chunks(chunk_paths, dest)
 
                 self.progress_update.emit(int(idx / total * 100))
                 self.status_update.emit(f"Restored {rec.path} ✓")
 
                 cleanup_chunks(chunk_paths)
-                merged.unlink(missing_ok=True)
 
             except Exception as exc:
                 log.exception("Restore failed for %s", rec.path)

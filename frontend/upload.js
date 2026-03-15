@@ -33,17 +33,27 @@ document.addEventListener("DOMContentLoaded", () => {
 
     async function handleFiles(files) {
         for (let i = 0; i < files.length; i++) {
-            await uploadFile(files[i]);
+            const alias = prompt(
+                `Enter an alias for "${files[i].name}" (leave empty to keep original name):`,
+                ""
+            );
+            // If user clicks Cancel on prompt, skip this file
+            if (alias === null) continue;
+            await uploadFile(files[i], alias);
         }
     }
 
-    async function uploadFile(file) {
+    async function uploadFile(file, alias = "") {
+        const displayName = alias || file.name;
         progressContainer.classList.remove("hidden");
-        statusText.textContent = `Uploading ${file.name}...`;
-        progressFill.style.width = "50%"; // Fake progress for now since fetch doesn't support upload progress natively easily
+        statusText.textContent = `Uploading ${displayName}...`;
+        progressFill.style.width = "50%";
 
         const formData = new FormData();
         formData.append("file", file);
+        if (alias) {
+            formData.append("alias", alias);
+        }
 
         try {
             const response = await fetch("/api/upload", {

@@ -52,8 +52,4 @@ CHUNK_SIZE: int = int(1.9 * 1024 * 1024 * 1024)  # 1.9 GB in bytes
 MAX_CONCURRENT_UPLOADS: int = 3
 MAX_CONCURRENT_DOWNLOADS: int = 3
 
-# ──────────────────────────────────────────────
-# Encryption
-# ──────────────────────────────────────────────
-PBKDF2_ITERATIONS: int = 600_000
-SALT_FILE: Path = APP_DIR / "salt.bin"
+
