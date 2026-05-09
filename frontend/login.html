@@ -1,0 +1,107 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Telegram Drive – Login</title>
+    <meta name="description" content="Log in to Telegram Drive with your phone number. Your files, your Telegram, your storage.">
+    <link rel="stylesheet" href="/styles.css">
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+</head>
+<body class="login-body">
+    <!-- Animated background -->
+    <div class="bg-gradient"></div>
+    <div class="bg-orb bg-orb-1"></div>
+    <div class="bg-orb bg-orb-2"></div>
+    <div class="bg-orb bg-orb-3"></div>
+
+    <div class="login-container">
+        <div class="login-card" id="login-card">
+            <!-- Logo -->
+            <div class="login-logo">
+                <svg width="48" height="48" viewBox="0 0 48 48" fill="none" xmlns="http://www.w3.org/2000/svg">
+                    <defs>
+                        <linearGradient id="tg-grad" x1="0" y1="0" x2="48" y2="48">
+                            <stop offset="0%" stop-color="#2AABEE"/>
+                            <stop offset="100%" stop-color="#229ED9"/>
+                        </linearGradient>
+                    </defs>
+                    <circle cx="24" cy="24" r="24" fill="url(#tg-grad)"/>
+                    <path d="M10.8 23.2L33.6 14.4C34.8 13.9 35.8 14.6 35.4 16.3L31.6 33.3C31.3 34.7 30.5 35 29.4 34.4L23.4 30L20.6 32.7C20.3 33 20 33.2 19.4 33.2L19.8 27L30.8 17.1C31.3 16.7 30.7 16.4 30 16.8L16.4 25.3L10.6 23.5C9.2 23.1 9.2 22.2 10.8 23.2Z" fill="white"/>
+                </svg>
+            </div>
+
+            <h1 class="login-title">Telegram Drive</h1>
+            <p class="login-subtitle">Unlimited storage, powered by your Telegram</p>
+
+            <!-- Step 1: Phone Number -->
+            <div id="step-phone" class="login-step active">
+                <div class="input-group">
+                    <label for="phone-input">Phone Number</label>
+                    <div class="phone-input-wrapper">
+                        <span class="phone-prefix">+</span>
+                        <input
+                            type="tel"
+                            id="phone-input"
+                            placeholder="91 98765 43210"
+                            autocomplete="tel"
+                            autofocus
+                        >
+                    </div>
+                    <p class="input-hint">Include country code. You'll receive an OTP in Telegram.</p>
+                </div>
+                <button id="btn-send-otp" class="btn-primary" onclick="sendOtp()">
+                    <span class="btn-text">Send OTP</span>
+                    <span class="btn-loader hidden">
+                        <span class="spinner"></span>
+                    </span>
+                </button>
+            </div>
+
+            <!-- Step 2: OTP Verification -->
+            <div id="step-otp" class="login-step">
+                <div class="input-group">
+                    <label for="otp-input">Verification Code</label>
+                    <div class="otp-boxes" id="otp-boxes">
+                        <input type="text" maxlength="1" class="otp-digit" data-index="0" inputmode="numeric">
+                        <input type="text" maxlength="1" class="otp-digit" data-index="1" inputmode="numeric">
+                        <input type="text" maxlength="1" class="otp-digit" data-index="2" inputmode="numeric">
+                        <input type="text" maxlength="1" class="otp-digit" data-index="3" inputmode="numeric">
+                        <input type="text" maxlength="1" class="otp-digit" data-index="4" inputmode="numeric">
+                    </div>
+                    <p class="input-hint" id="otp-hint">Enter the code sent to your Telegram app</p>
+                </div>
+                <button id="btn-verify-otp" class="btn-primary" onclick="verifyOtp()">
+                    <span class="btn-text">Verify & Login</span>
+                    <span class="btn-loader hidden">
+                        <span class="spinner"></span>
+                    </span>
+                </button>
+                <button class="btn-link" onclick="goBackToPhone()">← Use a different number</button>
+            </div>
+
+            <!-- Step 3: Success -->
+            <div id="step-success" class="login-step">
+                <div class="success-icon">
+                    <svg width="64" height="64" viewBox="0 0 24 24" fill="none" stroke="#34d399" stroke-width="2">
+                        <path d="M22 11.08V12a10 10 0 1 1-5.93-9.14"></path>
+                        <polyline points="22 4 12 14.01 9 11.01"></polyline>
+                    </svg>
+                </div>
+                <p class="success-text">Welcome, <span id="user-name"></span>!</p>
+                <p class="input-hint">Redirecting to your drive...</p>
+            </div>
+
+            <!-- Error display -->
+            <div id="error-msg" class="error-msg hidden"></div>
+        </div>
+
+        <p class="login-footer">
+            Your files are stored in your own Telegram Saved Messages.<br>
+            We never access your data.
+        </p>
+    </div>
+
+    <script src="/auth.js"></script>
+</body>
+</html>

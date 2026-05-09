@@ -1,0 +1,12 @@
+venv/
+.venv/
+__pycache__/
+*.pyc
+.env
+.DS_Store
+nvidia_api.py
+*.session
+.jwt_secret
+index.db
+salt.bin
+tmp/
