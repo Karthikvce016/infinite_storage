@@ -32,6 +32,9 @@ async def upload_file(
     except ValueError as e:
         raise HTTPException(status_code=401, detail=str(e))
 
+    # Ensure TEMP_DIR exists (may be wiped on Render's ephemeral FS)
+    TEMP_DIR.mkdir(parents=True, exist_ok=True)
+
     # Save to temp locally
     temp_file_path = TEMP_DIR / file.filename
     try:
@@ -119,10 +122,10 @@ async def download_file(
         raise HTTPException(status_code=404, detail="File not found")
 
     try:
-        chunk_paths = await download_chunks(client, "me", record.msg_ids)
-
-        # Ensure TEMP_DIR exists (may be wiped between restarts)
+        # Ensure TEMP_DIR exists (may be wiped between restarts on Render)
         TEMP_DIR.mkdir(parents=True, exist_ok=True)
+
+        chunk_paths = await download_chunks(client, "me", record.msg_ids)
 
         # Merge chunks directly to final file (no decryption)
         merged = TEMP_DIR / Path(file_id).name
