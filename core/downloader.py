@@ -39,13 +39,21 @@ async def _download_single(
                     raise FileNotFoundError(f"Message {msg_id} has no media")
 
                 out_path = dest_dir / f"chunk_{index}"
-                await client.download_media(
+                # download_media returns the actual file path (Telethon may
+                # append an extension like .jpg), so we must use the return
+                # value instead of out_path.
+                actual_path = await client.download_media(
                     msg,
                     file=str(out_path),
                     progress_callback=progress_cb,
                 )
-                log.info("Downloaded msg_id=%d → %s", msg_id, out_path.name)
-                return out_path
+                if actual_path is None:
+                    raise FileNotFoundError(
+                        f"download_media returned None for msg_id={msg_id}"
+                    )
+                actual_path = Path(actual_path)
+                log.info("Downloaded msg_id=%d → %s", msg_id, actual_path.name)
+                return actual_path
 
             except FloodWaitError as e:
                 log.warning("FloodWait: sleeping %d s (msg_id=%d)", e.seconds, msg_id)
