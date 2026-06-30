@@ -1,9 +1,10 @@
 telethon>=1.36.0
-cryptography>=42.0.0
-watchdog>=4.0.0
-PyQt6>=6.6.0
 aiofiles>=23.2.0
 fastapi
 uvicorn
 python-multipart
 python-dotenv
+sqlalchemy>=2.0
+asyncpg
+psycopg2-binary
+pyjwt

@@ -1,28 +1,56 @@
+"""
+routes.py – File upload/download/delete endpoints for Telegram Drive.
+
+All endpoints are folder-scoped (by folder ID) and require authentication.
+Uses the StorageProvider abstraction — no direct Telegram calls.
+"""
+
 import shutil
+import logging
 from pathlib import Path
-from typing import List, Optional
+from typing import Optional
 
 from fastapi import APIRouter, UploadFile, File, Form, Request, HTTPException, BackgroundTasks
-from fastapi.responses import JSONResponse, StreamingResponse
+from fastapi.responses import StreamingResponse
 
 from config.settings import TEMP_DIR
 from core.chunk_manager import compute_hash, split_file, merge_chunks, cleanup_chunks
-from core.uploader import upload_chunks, delete_messages
-from core.downloader import download_chunks
+from api.auth_routes import require_auth
 from storage.database import FileRecord
+
+log = logging.getLogger(__name__)
 
 router = APIRouter()
 
 
-@router.post("/upload")
+def _get_context(request: Request):
+    """Extract storage provider, owner, and DB from request."""
+    owner = require_auth(request)
+    storage = request.app.state.storage
+    db = request.app.state.db
+    return storage, owner, db
+
+
+def _resolve_folder(db, folder_id: int, owner: str):
+    """Resolve a folder by ID, raise 404 if not found."""
+    folder = db.get_folder_by_id(folder_id, owner)
+    if not folder:
+        raise HTTPException(status_code=404, detail=f"Folder with id '{folder_id}' not found")
+    return folder
+
+
+@router.post("/folders/{folder_id:int}/upload")
 async def upload_file(
+    folder_id: int,
     request: Request,
     file: UploadFile = File(...),
     alias: Optional[str] = Form(None),
 ):
-    """Uploads a file to Telegram storage. Optionally accepts an alias name."""
-    tg_client = request.app.state.tg_client
-    db = request.app.state.db
+    """Uploads a file to a specific folder via the storage provider."""
+    storage, owner, db = _get_context(request)
+
+    folder = _resolve_folder(db, folder_id, owner)
+    folder_name = folder.name
 
     # Save to temp locally
     temp_file_path = TEMP_DIR / file.filename
@@ -38,54 +66,73 @@ async def upload_file(
     if alias and alias.strip():
         original_ext = Path(file.filename).suffix
         alias_name = alias.strip()
-        # Add the original extension if the alias doesn't already have one
         if not Path(alias_name).suffix:
             alias_name += original_ext
         rel_path = alias_name
     else:
         rel_path = file.filename
+
     new_hash = compute_hash(temp_file_path)
+    chunk_paths = []
 
     try:
-        existing = db.get_file(rel_path)
+        existing = db.get_file(rel_path, folder_name, owner)
         if existing and existing.hash == new_hash:
             temp_file_path.unlink(missing_ok=True)
             return {"message": f"Skipped {rel_path} (unchanged)"}
 
-        channel = await tg_client.ensure_channel()
-
         if existing:
-            await delete_messages(tg_client.client, channel, existing.msg_ids)
+            await storage.delete_file(folder_name, existing.msg_ids)
 
-        # Split raw file directly (no encryption)
+        # Split and upload
         chunk_paths = split_file(temp_file_path)
-        msg_ids = await upload_chunks(tg_client.client, channel, chunk_paths)
+
+        msg_ids = await storage.upload_file(
+            folder_name=folder_name,
+            chunk_paths=chunk_paths,
+            filename=rel_path,
+            file_hash=new_hash,
+        )
 
         record = FileRecord(
             path=rel_path,
             hash=new_hash,
             size=file_size,
             chunks=len(chunk_paths),
+            folder=folder_name,
+            owner=owner,
             msg_ids=msg_ids,
         )
         db.upsert_file(record)
 
+    except HTTPException:
+        raise
     except Exception as exc:
+        log.exception("Upload failed for %s", rel_path)
         raise HTTPException(status_code=500, detail=f"Upload failed: {exc}")
     finally:
-        # Cleanup temp local files
-        cleanup_chunks(chunk_paths if 'chunk_paths' in locals() else [])
+        cleanup_chunks(chunk_paths)
         temp_file_path.unlink(missing_ok=True)
 
-    return {"message": "File uploaded successfully", "file": {"name": rel_path, "size": file_size}}
+    return {"message": "File uploaded successfully", "file": {"name": rel_path, "size": file_size, "folder": folder_name}}
 
 
-@router.get("/files")
-def list_files(request: Request):
-    """Returns list of stored files from the database."""
-    db = request.app.state.db
-    files = db.get_all_files()
-    return [{"id": f.path, "name": f.path, "size": f.size} for f in files]
+@router.get("/folders/{folder_id:int}/files")
+def list_files(folder_id: int, request: Request):
+    """Returns list of stored files in a folder."""
+    _, owner, db = _get_context(request)
+    folder = _resolve_folder(db, folder_id, owner)
+    files = db.get_files_in_folder(folder.name, owner)
+    return [
+        {
+            "id": f.path,
+            "name": f.path,
+            "size": f.size,
+            "folder": f.folder,
+            "chunks": f.chunks,
+        }
+        for f in files
+    ]
 
 
 def cleanup_file_task(path: Path):
@@ -96,24 +143,32 @@ def cleanup_file_task(path: Path):
         pass
 
 
-@router.get("/download/{file_id}")
-async def download_file(file_id: str, request: Request, background_tasks: BackgroundTasks):
-    """Downloads a file by retrieving chunks, merging, and decrypting."""
-    tg_client = request.app.state.tg_client
-    db = request.app.state.db
+@router.get("/folders/{folder_id:int}/download/{file_id:path}")
+async def download_file(
+    folder_id: int,
+    file_id: str,
+    request: Request,
+    background_tasks: BackgroundTasks,
+):
+    """Downloads a file by retrieving chunks and streaming to the browser."""
+    storage, owner, db = _get_context(request)
+    folder = _resolve_folder(db, folder_id, owner)
+    folder_name = folder.name
 
-    record = db.get_file(file_id)
+    record = db.get_file(file_id, folder_name, owner)
     if not record:
         raise HTTPException(status_code=404, detail="File not found")
 
     try:
-        channel = await tg_client.ensure_channel()
-        chunk_paths = await download_chunks(tg_client.client, channel, record.msg_ids)
+        chunk_paths = await storage.download_file(
+            folder_name=folder_name,
+            msg_ids=record.msg_ids,
+            dest_dir=TEMP_DIR,
+        )
 
-        # Merge chunks directly to final file (no decryption)
+        # Merge chunks to temp
         merged = TEMP_DIR / Path(file_id).name
         merge_chunks(chunk_paths, merged)
-
         cleanup_chunks(chunk_paths)
 
         def file_iterator():
@@ -123,31 +178,38 @@ async def download_file(file_id: str, request: Request, background_tasks: Backgr
 
         background_tasks.add_task(cleanup_file_task, merged)
 
+        safe_name = file_id.replace('"', '\\"')
         return StreamingResponse(
             file_iterator(),
             media_type="application/octet-stream",
-            headers={"Content-Disposition": f"attachment; filename={file_id}"}
+            headers={"Content-Disposition": f'attachment; filename="{safe_name}"'},
         )
 
+    except HTTPException:
+        raise
     except Exception as exc:
+        log.exception("Download failed for %s", file_id)
         raise HTTPException(status_code=500, detail=f"Download failed: {exc}")
 
 
-@router.delete("/file/{file_id}")
-async def delete_file(file_id: str, request: Request):
-    """Deletes a file from Telegram and database."""
-    tg_client = request.app.state.tg_client
-    db = request.app.state.db
+@router.delete("/folders/{folder_id:int}/files/{file_id:path}")
+async def delete_file(folder_id: int, file_id: str, request: Request):
+    """Deletes a file from the storage backend and database."""
+    storage, owner, db = _get_context(request)
+    folder = _resolve_folder(db, folder_id, owner)
+    folder_name = folder.name
 
-    record = db.get_file(file_id)
+    record = db.get_file(file_id, folder_name, owner)
     if not record:
         raise HTTPException(status_code=404, detail="File not found")
 
     try:
-        channel = await tg_client.ensure_channel()
-        await delete_messages(tg_client.client, channel, record.msg_ids)
-        db.delete_file(file_id)
+        await storage.delete_file(folder_name, record.msg_ids)
+        db.delete_file(file_id, folder_name, owner)
+    except HTTPException:
+        raise
     except Exception as exc:
+        log.exception("Delete failed for %s", file_id)
         raise HTTPException(status_code=500, detail=f"Delete failed: {exc}")
 
     return {"message": "File deleted successfully"}

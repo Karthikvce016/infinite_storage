@@ -2,21 +2,23 @@
 main.py – Entry point for Telegram Drive (Web API).
 
 Architecture:
-    1. Start FastAPI application via uvicorn.
-    2. Initialize Telegram Client and Database via FastAPI lifespan.
-    3. Expose REST endpoints under `/api`.
-    4. Serve frontend via StaticFiles.
+    1. Initialize Database (Postgres or SQLite fallback).
+    2. Initialize Storage Provider (Telegram Bot).
+    3. Run DB rebuild to sync file index from Telegram.
+    4. Start FastAPI application via uvicorn.
 """
 
-import asyncio
 import logging
 import os
 import sys
+from contextlib import asynccontextmanager
+
 import uvicorn
 
-from config.settings import API_ID, API_HASH
+from config.settings import API_ID, API_HASH, BOT_TOKEN, DATABASE_URL
 from storage.database import Database
-from core.telegram_client import TelegramDriveClient
+from core.storage.telegram_provider import TelegramProvider
+from core.db_rebuild import rebuild_index
 
 from api.server import app
 
@@ -27,6 +29,58 @@ logging.basicConfig(
 log = logging.getLogger("telegram_drive")
 
 
+@asynccontextmanager
+async def lifespan(app):
+    """FastAPI lifespan: startup and shutdown logic."""
+    # ── Startup ──────────────────────────────────────────
+    log.info("SYSTEM: Starting Telegram Drive...")
+
+    # 1. Database
+    db = Database()
+    db.connect()
+    app.state.db = db
+
+    # 2. Storage provider (Telegram Bot)
+    storage = TelegramProvider()
+    try:
+        await storage.connect()
+        storage.set_db(db)
+        app.state.storage = storage
+
+        # Ensure default folder exists
+        await storage.ensure_default_folder()
+
+        # 3. Rebuild file index from Telegram
+        try:
+            summary = await rebuild_index(storage, db, owner="admin")
+            log.info("SYSTEM: DB rebuild on startup — %s", summary)
+        except Exception as rebuild_err:
+            log.warning("SYSTEM: DB rebuild failed (non-fatal): %s", rebuild_err)
+
+    except Exception as exc:
+        log.error("SYSTEM: Failed to connect storage provider: %s", exc)
+        log.error(
+            "SYSTEM: The app will start but storage operations will fail. "
+            "Check BOT_TOKEN and ensure the bot is an admin in the storage channel."
+        )
+        app.state.storage = None
+
+    log.info("SYSTEM: Startup complete.")
+
+    yield
+
+    # ── Shutdown ─────────────────────────────────────────
+    log.info("SYSTEM: Shutting down...")
+    if app.state.storage:
+        await app.state.storage.disconnect()
+    db.close()
+    log.info("SYSTEM: Shutdown complete.")
+
+
+# Attach lifespan to the app
+app.router.lifespan_context = lifespan
+
+
 def main() -> None:
     # ── Pre-flight checks ────────────────────────────────────
     if not API_ID or not API_HASH:
@@ -34,43 +88,27 @@ def main() -> None:
             "\n⚠  Telegram API credentials missing.\n"
             "   1. Visit https://my.telegram.org and create an application.\n"
             "   2. Copy .env.example to .env and fill in API_ID and API_HASH.\n"
-            "      Or set them as environment variables on your deployment platform.\n"
         )
         sys.exit(1)
 
-    db = Database()
-    db.connect()
+    if not BOT_TOKEN:
+        print(
+            "\n⚠  Bot token missing.\n"
+            "   1. Talk to @BotFather on Telegram and create a bot.\n"
+            "   2. Copy the token and set BOT_TOKEN in your .env file.\n"
+            "   3. Add the bot as an admin to your private storage channel.\n"
+            "   4. Set STORAGE_CHANNEL_ID in .env (the channel's numeric ID).\n"
+        )
+        sys.exit(1)
 
-    tg_client = TelegramDriveClient()
-    
-    # Store instances in FastAPI app state for routes to access
-    app.state.db = db
-    app.state.tg_client = tg_client
-
-    # Create a lifespan context manager for FastAPI
-    @app.router.on_event("startup")
-    async def startup_event():
-        log.info("Starting up Telegram Client...")
-        await tg_client.create_and_connect()
-        try:
-            authorized = await tg_client.is_authorized()
-            if not authorized:
-                log.warning("Telegram client is NOT authorized! Please check instructions to login.")
-            else:
-                log.info("Telegram client authorized.")
-                await tg_client.ensure_channel()
-        except Exception as e:
-            log.error("Failed to authenticate Telegram client on startup: %s", e)
-
-    @app.router.on_event("shutdown")
-    async def shutdown_event():
-        log.info("Disconnecting Telegram Client...")
-        await tg_client.disconnect()
-        db.close()
+    if DATABASE_URL:
+        log.info("SYSTEM: Using PostgreSQL from DATABASE_URL")
+    else:
+        log.info("SYSTEM: No DATABASE_URL found — using local SQLite")
 
     # Launch uvicorn
     port = int(os.environ.get("PORT", 8000))
-    log.info("Starting Web API on http://0.0.0.0:%d", port)
+    log.info("SYSTEM: Starting Web API on http://0.0.0.0:%d", port)
     uvicorn.run(app, host="0.0.0.0", port=port)
 
 

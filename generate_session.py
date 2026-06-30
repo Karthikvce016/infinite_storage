@@ -1,9 +1,11 @@
 """
-generate_session.py – Generate a Telegram StringSession for server authentication.
+generate_session.py – [DEPRECATED]
+
+Session strings are now generated automatically via the web UI login flow.
+This script is kept for debugging/manual session generation only.
 
 Reads API_ID and API_HASH from environment variables (or .env file).
 Prompts for phone number and OTP, then prints the session string.
-Add the printed string to your .env file as SESSION_STRING=<value>.
 """
 
 import os
@@ -28,7 +30,7 @@ async def main():
 
     session_string = client.session.save()
     print("\n✅ Telegram session created successfully!\n")
-    print("Add this to your .env file or Render dashboard:\n")
+    print("Session string (for debugging only):\n")
     print(f"SESSION_STRING={session_string}")
     print()
 

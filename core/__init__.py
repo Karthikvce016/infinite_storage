@@ -1,7 +1,11 @@
 """
-Core backend logic for Telegram Drive.
+core – Business logic for Telegram Drive.
 
-This package contains Telegram API communication, chunking, encryption,
-upload/download pipelines, synchronization orchestration, and file watching.
+Modules:
+    storage/            – Pluggable storage provider interface and implementations
+    rate_limiter        – Async token-bucket rate limiter
+    chunk_manager       – File splitting, merging, and hashing
+    uploader            – Rate-limited chunk uploader (Telegram)
+    downloader          – Rate-limited chunk downloader (Telegram)
+    db_rebuild          – Reconstruct file index from storage backend
 """
-

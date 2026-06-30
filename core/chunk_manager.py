@@ -1,7 +1,7 @@
 """
 chunk_manager.py – File splitting, merging, and hashing for Telegram Drive.
 
-Telegram imposes a 2 GB upload limit; we chunk at 1.9 GB to stay safe.
+Chunks at 20 MB (configurable) to stay within Render free tier constraints.
 """
 
 import hashlib
@@ -22,6 +22,11 @@ def compute_hash(path: Path, block_size: int = 8 * 1024 * 1024) -> str:
                 break
             sha.update(data)
     return sha.hexdigest()
+
+
+def compute_hash_from_bytes(data: bytes) -> str:
+    """Return hex-encoded SHA-256 hash of raw bytes."""
+    return hashlib.sha256(data).hexdigest()
 
 
 def split_file(path: Path, chunk_size: int = CHUNK_SIZE) -> List[Path]:
@@ -70,4 +75,3 @@ def cleanup_chunks(chunk_paths: List[Path]) -> None:
             cp.unlink(missing_ok=True)
         except OSError:
             pass
-

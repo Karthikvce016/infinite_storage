@@ -4,3 +4,7 @@ __pycache__/
 *.pyc
 .env
 .DS_Store
+index.db
+salt.bin
+tmp/
+*.session

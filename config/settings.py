@@ -19,37 +19,59 @@ load_dotenv()
 API_ID: int = int(os.getenv("API_ID", "0"))
 API_HASH: str = os.getenv("API_HASH", "")
 
+# Bot token from @BotFather (used for Bot API mode)
+BOT_TOKEN: str = os.getenv("BOT_TOKEN", "")
+
+# User session string (used for full API access — bots can't create channels)
+# Generate via: python generate_session.py
+SESSION_STRING: str = os.getenv("SESSION_STRING", "")
+
+# The channel where the bot stores files.
+# Can be a numeric ID (e.g. -1001234567890) or a username (e.g. @my_storage).
+STORAGE_CHANNEL_ID: str = os.getenv("STORAGE_CHANNEL_ID", "")
+
 # ──────────────────────────────────────────────
-# Storage channel
+# Web auth – simple password for personal use
 # ──────────────────────────────────────────────
-CHANNEL_NAME: str = os.getenv("CHANNEL_NAME", "TelegramDriveStorage")
+APP_PASSWORD: str = os.getenv("APP_PASSWORD", "admin")
+
+# ──────────────────────────────────────────────
+# PostgreSQL (Railway / Supabase / local)
+# ──────────────────────────────────────────────
+DATABASE_URL: str = os.getenv("DATABASE_URL", "")
+
+# ──────────────────────────────────────────────
+# Folder prefix used to identify storage channels
+# ──────────────────────────────────────────────
+FOLDER_PREFIX: str = "TGDrive_"
+DEFAULT_FOLDER_NAME: str = "General"
 
 # ──────────────────────────────────────────────
 # Paths
 # ──────────────────────────────────────────────
-# Project root = parent of config/
 _PROJECT_ROOT: Path = Path(__file__).resolve().parent.parent
 
-# APP_DIR stores session, DB, salt, and temp files.
-# On Render: set APP_DATA_DIR=/var/data (persistent disk mount).
-# Locally:   defaults to the project root.
 APP_DIR: Path = Path(os.getenv("APP_DATA_DIR", str(_PROJECT_ROOT)))
 APP_DIR.mkdir(parents=True, exist_ok=True)
 
 DB_PATH: Path = APP_DIR / "index.db"
-DEFAULT_SYNC_FOLDER: Path = Path.home() / "TelegramDrive"
 TEMP_DIR: Path = APP_DIR / "tmp"
 TEMP_DIR.mkdir(parents=True, exist_ok=True)
 
 # ──────────────────────────────────────────────
-# Chunk settings
+# Chunk settings (20 MB — safe for Render free tier ~512 MB RAM)
 # ──────────────────────────────────────────────
-CHUNK_SIZE: int = int(1.9 * 1024 * 1024 * 1024)  # 1.9 GB in bytes
+CHUNK_SIZE: int = 20 * 1024 * 1024  # 20 MB
 
 # ──────────────────────────────────────────────
 # Upload / download concurrency
+# Keep at 1 to avoid Telegram rate-limit bans
 # ──────────────────────────────────────────────
-MAX_CONCURRENT_UPLOADS: int = 3
-MAX_CONCURRENT_DOWNLOADS: int = 3
+MAX_CONCURRENT_UPLOADS: int = 1
+MAX_CONCURRENT_DOWNLOADS: int = 1
 
-
+# ──────────────────────────────────────────────
+# Rate limiting — anti-ban
+# ──────────────────────────────────────────────
+RATE_LIMIT_DELAY: float = float(os.getenv("RATE_LIMIT_DELAY", "2.0"))       # seconds between API calls
+MAX_REQUESTS_PER_MINUTE: int = int(os.getenv("MAX_REQUESTS_PER_MINUTE", "20"))
