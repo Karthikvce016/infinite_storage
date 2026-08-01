@@ -792,6 +792,39 @@ body {
     background: rgba(239, 68, 68, 0.1);
 }
 
+.btn-action.preview:hover {
+    border-color: var(--accent);
+    color: var(--accent);
+    background: var(--accent-glow);
+}
+
+/* Preview Modal */
+.modal-overlay .preview-modal {
+    max-width: 90vw;
+    max-height: 90vh;
+}
+
+.modal-overlay .preview-modal .modal-header {
+    flex-shrink: 0;
+}
+
+.modal-overlay .preview-modal .modal-body {
+    overflow: auto;
+}
+
+.modal-overlay .preview-modal video,
+.modal-overlay .preview-modal audio {
+    outline: none;
+}
+
+.modal-overlay .preview-modal video::-webkit-media-controls-panel {
+    background: linear-gradient(transparent, var(--bg-secondary));
+}
+
+.modal-overlay .preview-modal img {
+    display: block;
+}
+
 /* Empty state */
 .empty-state {
     text-align: center;

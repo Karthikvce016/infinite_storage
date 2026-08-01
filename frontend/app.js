@@ -394,6 +394,7 @@ async function loadFiles() {
 
             files.forEach(file => {
                 const tr = document.createElement("tr");
+                const previewable = isPreviewable(file.id);
                 tr.innerHTML = `
                     <td>
                         <div class="file-name-cell">
@@ -409,6 +410,13 @@ async function loadFiles() {
                     <td class="col-size">${formatBytes(file.size)}</td>
                     <td>
                         <div class="actions">
+                            ${previewable ? `<button class="btn-action preview" onclick="previewFile('${escapeAttr(file.id)}')" title="Preview">
+                                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                                    <path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/>
+                                    <circle cx="12" cy="12" r="3"/>
+                                </svg>
+                                Preview
+                            </button>` : ''}
                             <button class="btn-action download" onclick="downloadFile('${escapeAttr(file.id)}')">Download</button>
                             <button class="btn-action delete" onclick="deleteFile('${escapeAttr(file.id)}')">Delete</button>
                         </div>
@@ -560,6 +568,132 @@ async function downloadFile(fileId) {
         console.error("Download error:", err);
     }
     setTimeout(() => statusEl.remove(), 4000);
+}
+
+// ── Preview ──
+function isPreviewable(fileId) {
+    const ext = fileId.substring(fileId.lastIndexOf('.')).toLowerCase();
+    const previewable = [
+        // Images
+        '.jpg', '.jpeg', '.png', '.gif', '.webp', '.svg', '.bmp', '.ico',
+        // Videos
+        '.mp4', '.webm', '.mov', '.mkv',
+        // Audio
+        '.mp3', '.wav', '.ogg', '.m4a', '.flac',
+        // Documents
+        '.pdf', '.txt', '.md', '.json', '.xml', '.html', '.css', '.js',
+    ];
+    return previewable.includes(ext);
+}
+
+function previewFile(fileId) {
+    if (!isPreviewable(fileId)) {
+        alert('This file type cannot be previewed. Please download it instead.');
+        return;
+    }
+
+    const previewUrl = `/api/folders/${currentFolderId}/preview/${encodeURIComponent(fileId)}`;
+    openPreviewModal(fileId, previewUrl);
+}
+
+function openPreviewModal(fileId, previewUrl) {
+    const modal = document.createElement('div');
+    modal.className = 'modal-overlay';
+    modal.style.zIndex = '2000';
+    modal.onclick = (e) => { if (e.target === modal) closePreviewModal(modal); };
+
+    const ext = fileId.substring(fileId.lastIndexOf('.')).toLowerCase();
+    let contentHtml = '';
+
+    if (['.jpg', '.jpeg', '.png', '.gif', '.webp', '.bmp', '.ico'].includes(ext)) {
+        contentHtml = `<img src="${previewUrl}" alt="${escapeHtml(fileId)}" style="max-width:100%;max-height:70vh;object-fit:contain;">`;
+    } else if (['.svg'].includes(ext)) {
+        contentHtml = `<img src="${previewUrl}" alt="${escapeHtml(fileId)}" style="max-width:100%;max-height:70vh;object-fit:contain;">`;
+    } else if (['.mp4', '.webm', '.mov', '.mkv'].includes(ext)) {
+        contentHtml = `
+            <video controls style="max-width:100%;max-height:70vh;">
+                <source src="${previewUrl}" type="${getMediaType(ext)}">
+                Your browser does not support video playback.
+            </video>
+        `;
+    } else if (['.mp3', '.wav', '.ogg', '.m4a', '.flac'].includes(ext)) {
+        contentHtml = `
+            <audio controls style="width:100%;max-width:500px;">
+                <source src="${previewUrl}" type="${getMediaType(ext)}">
+                Your browser does not support audio playback.
+            </audio>
+        `;
+    } else if (['.pdf'].includes(ext)) {
+        contentHtml = `
+            <iframe src="${previewUrl}" style="width:100%;height:70vh;border:none;border-radius:var(--radius-md);"></iframe>
+        `;
+    } else if (['.txt', '.md', '.json', '.xml', '.html', '.css', '.js'].includes(ext)) {
+        contentHtml = `
+            <pre style="max-height:70vh;overflow:auto;padding:16px;background:var(--surface);border-radius:var(--radius-md);font-size:0.85rem;line-height:1.6;white-space:pre-wrap;word-wrap:break-word;">
+                <code id="preview-text-content">Loading...</code>
+            </pre>
+        `;
+        // Fetch text content
+        fetch(previewUrl)
+            .then(r => r.text())
+            .then(text => {
+                const el = document.getElementById('preview-text-content');
+                if (el) el.textContent = text;
+            })
+            .catch(() => {
+                const el = document.getElementById('preview-text-content');
+                if (el) el.textContent = 'Failed to load preview';
+            });
+    }
+
+    modal.innerHTML = `
+        <div class="modal-card preview-modal" style="max-width:90vw;max-height:90vh;padding:0;overflow:hidden;" onclick="event.stopPropagation()">
+            <div class="modal-header" style="display:flex;align-items:center;justify-content:space-between;padding:16px 24px;border-bottom:1px solid var(--surface-border);background:var(--surface);">
+                <h3 style="font-size:1rem;font-weight:600;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;max-width:calc(100% - 100px);">${escapeHtml(fileId)}</h3>
+                <div style="display:flex;gap:8px;">
+                    <button class="btn-secondary btn-sm" onclick="downloadFile('${escapeAttr(fileId)}')">
+                        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                            <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="17 8 12 3 7 8"/><line x1="12" y1="3" x2="12" y2="15"/>
+                        </svg>
+                        Download
+                    </button>
+                    <button class="btn-icon" onclick="closePreviewModal(this.closest('.modal-overlay'))" title="Close">
+                        <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                            <line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/>
+                        </svg>
+                    </button>
+                </div>
+            </div>
+            <div class="modal-body" style="padding:24px;overflow:auto;max-height:calc(90vh - 80px);background:var(--bg-secondary);">
+                ${contentHtml}
+            </div>
+        </div>
+    `;
+
+    document.body.appendChild(modal);
+    // Trigger animation
+    requestAnimationFrame(() => modal.style.opacity = '1');
+}
+
+function closePreviewModal(modal) {
+    if (!modal) return;
+    modal.style.opacity = '0';
+    setTimeout(() => modal.remove(), 200);
+}
+
+function getMediaType(ext) {
+    const types = {
+        '.mp4': 'video/mp4',
+        '.webm': 'video/webm',
+        '.mov': 'video/quicktime',
+        '.mkv': 'video/x-matroska',
+        '.mp3': 'audio/mpeg',
+        '.wav': 'audio/wav',
+        '.ogg': 'audio/ogg',
+        '.m4a': 'audio/mp4',
+        '.flac': 'audio/flac',
+    };
+    return types[ext] || 'application/octet-stream';
 }
 
 // ── Delete ──

@@ -200,6 +200,131 @@ async def download_file(
         raise HTTPException(status_code=500, detail=f"Download failed: {exc}")
 
 
+def _get_media_type(filename: str) -> str:
+    """Determine media type from file extension."""
+    ext = Path(filename).suffix.lower()
+    media_types = {
+        # Images
+        ".jpg": "image/jpeg",
+        ".jpeg": "image/jpeg",
+        ".png": "image/png",
+        ".gif": "image/gif",
+        ".webp": "image/webp",
+        ".svg": "image/svg+xml",
+        ".bmp": "image/bmp",
+        ".ico": "image/x-icon",
+        # Videos
+        ".mp4": "video/mp4",
+        ".webm": "video/webm",
+        ".mov": "video/quicktime",
+        ".avi": "video/x-msvideo",
+        ".mkv": "video/x-matroska",
+        # Audio
+        ".mp3": "audio/mpeg",
+        ".wav": "audio/wav",
+        ".ogg": "audio/ogg",
+        ".m4a": "audio/mp4",
+        ".flac": "audio/flac",
+        # Documents
+        ".pdf": "application/pdf",
+        ".txt": "text/plain",
+        ".md": "text/markdown",
+        ".json": "application/json",
+        ".xml": "application/xml",
+        ".html": "text/html",
+        ".css": "text/css",
+        ".js": "application/javascript",
+        # Archives
+        ".zip": "application/zip",
+        ".tar": "application/x-tar",
+        ".gz": "application/gzip",
+        ".rar": "application/vnd.rar",
+        ".7z": "application/x-7z-compressed",
+    }
+    return media_types.get(ext, "application/octet-stream")
+
+
+def _is_previewable(filename: str) -> bool:
+    """Check if file type supports inline preview."""
+    ext = Path(filename).suffix.lower()
+    previewable = {
+        # Images
+        ".jpg", ".jpeg", ".png", ".gif", ".webp", ".svg", ".bmp", ".ico",
+        # Videos
+        ".mp4", ".webm", ".mov", ".mkv",
+        # Audio
+        ".mp3", ".wav", ".ogg", ".m4a", ".flac",
+        # Documents
+        ".pdf", ".txt", ".md", ".json", ".xml", ".html", ".css", ".js",
+    }
+    return ext in previewable
+
+
+@router.get("/folders/{folder_id:int}/preview/{file_id:path}")
+async def preview_file(
+    folder_id: int,
+    file_id: str,
+    request: Request,
+    background_tasks: BackgroundTasks,
+):
+    """Preview a file inline in the browser (for images, videos, PDFs, text, etc.)."""
+    storage, owner, db = _get_context(request)
+    folder = _resolve_folder(db, folder_id, owner)
+    folder_name = folder.name
+
+    log.info("SYSTEM: Preview request — file_id=%s, folder=%s, owner=%s", file_id, folder_name, owner)
+
+    record = db.get_file(file_id, folder_name, owner)
+    if not record:
+        log.warning("SYSTEM: Preview failed — file not found: %s in folder %s", file_id, folder_name)
+        raise HTTPException(status_code=404, detail="File not found")
+
+    if not _is_previewable(file_id):
+        raise HTTPException(status_code=400, detail="File type not previewable")
+
+    log.info("SYSTEM: Preview — found record with %d chunks, msg_ids=%s", record.chunks, record.msg_ids)
+
+    try:
+        chunk_paths = await storage.download_file(
+            folder_name=folder_name,
+            msg_ids=record.msg_ids,
+            dest_dir=TEMP_DIR,
+        )
+        log.info("SYSTEM: Preview — downloaded %d chunks to temp", len(chunk_paths))
+
+        # Merge chunks to temp
+        merged = TEMP_DIR / Path(file_id).name
+        merge_chunks(chunk_paths, merged)
+        cleanup_chunks(chunk_paths)
+        log.info("SYSTEM: Preview — merged chunks to %s (%d bytes)", merged, merged.stat().st_size)
+
+        def file_iterator():
+            with open(merged, "rb") as f:
+                while chunk := f.read(8 * 1024 * 1024):
+                    yield chunk
+
+        background_tasks.add_task(cleanup_file_task, merged)
+
+        media_type = _get_media_type(file_id)
+        safe_name = file_id.replace('"', '\\"')
+        log.info("SYSTEM: Preview — streaming response for %s (type: %s)", safe_name, media_type)
+        return StreamingResponse(
+            file_iterator(),
+            media_type=media_type,
+            headers={
+                "Content-Disposition": f'inline; filename="{safe_name}"',
+                "Cache-Control": "public, max-age=3600",
+                "Accept-Ranges": "bytes",
+            },
+        )
+
+    except HTTPException:
+        raise
+    except Exception as exc:
+        log.exception("Preview failed for %s", file_id)
+        raise HTTPException(status_code=500, detail=f"Preview failed: {exc}")
+
+
 @router.delete("/folders/{folder_id:int}/files/{file_id:path}")
 async def delete_file(folder_id: int, file_id: str, request: Request):
     """Deletes a file from the storage backend and database."""
