@@ -1,16 +1,15 @@
 # Telegram Drive
 
-A web application that provides Google-Drive-like file storage using a private Telegram channel as encrypted backend storage.
+A web application that provides Google-Drive-like file storage using a private Telegram channel as backend storage.
 
 ## Features
 
-- **AES-256-GCM encryption** — files are encrypted before leaving your machine
 - **Automatic chunking** — large files are split into ≤ 1.9 GB chunks to respect Telegram limits
 - **Parallel uploads** — chunks are uploaded concurrently (semaphore-limited) for speed
 - **Two-step upload optimisation** — `upload_file()` + `send_file()` for faster throughput
 - **SHA-256 change detection** — only changed files are re-uploaded
-- **SQLite index** — maps local files to Telegram message IDs
-- **Restore system** — download, merge, and decrypt all files on a new machine
+- **SQLite/PostgreSQL index** — maps local files to Telegram message IDs
+- **Restore system** — download and merge all files on a new machine
 - **FloodWait handling** — automatic sleep & retry on Telegram rate limits
 - **FastAPI Web Backend** — REST API with upload, download, list, and delete endpoints
 - **Responsive Web UI** — works on desktop and mobile browsers
@@ -116,7 +115,6 @@ Open <http://localhost:8000> in your browser to access the web UI.
 | Library          | Purpose                         |
 |------------------|----------------------------------|
 | telethon         | Telegram MTProto client          |
-| cryptography     | AES-256-GCM encryption          |
 | watchdog         | Filesystem event monitoring      |
 | fastapi          | REST API framework               |
 | uvicorn          | ASGI server                      |

@@ -97,6 +97,21 @@ async def login(request: Request):
     )
 
     log.info("SYSTEM: User '%s' logged in from %s", username, request.client.host)
+
+    # Trigger DB rebuild if DB is empty (e.g., after logout/login or deploy)
+    try:
+        db = request.app.state.db
+        storage = request.app.state.storage
+        if storage:
+            folders = db.get_all_folders(username)
+            if not folders:
+                log.info("SYSTEM: DB empty on login, triggering rebuild...")
+                from core.db_rebuild import rebuild_index
+                summary = await rebuild_index(storage, db, owner=username)
+                log.info("SYSTEM: Rebuild on login complete — %s", summary)
+    except Exception as exc:
+        log.warning("SYSTEM: Auto-rebuild on login failed (non-fatal): %s", exc)
+
     return response
 
 

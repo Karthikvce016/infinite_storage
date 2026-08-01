@@ -37,20 +37,23 @@ async def list_folders(request: Request, parent_id: int = None):
 
     folders = db.get_child_folders(parent_id, owner)
 
-    # If root and DB is empty (first time), rebuild from storage
+    # If root and DB is empty (first time), ensure default folder exists
+    # storage.list_folders() reads from DB so it can't be used as a fallback
     if parent_id is None and not folders:
         try:
-            provider_folders = await storage.list_folders()
-            for f in provider_folders:
-                db.upsert_folder(FolderRecord(
-                    name=f["name"],
-                    channel_id=f["channel_id"],
-                    owner=owner,
-                    parent_id=None,
-                ))
+            from config.settings import DEFAULT_FOLDER_NAME
+            channel_id = 0
+            if hasattr(storage, '_storage_channel_id') and storage._storage_channel_id:
+                channel_id = storage._storage_channel_id
+            db.upsert_folder(FolderRecord(
+                name=DEFAULT_FOLDER_NAME,
+                channel_id=channel_id,
+                owner=owner,
+                parent_id=None,
+            ))
             folders = db.get_child_folders(None, owner)
         except Exception as exc:
-            log.warning("SYSTEM: Failed to list folders from storage: %s", exc)
+            log.warning("SYSTEM: Failed to ensure default folder: %s", exc)
 
     return [
         {

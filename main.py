@@ -47,10 +47,7 @@ async def lifespan(app):
         storage.set_db(db)
         app.state.storage = storage
 
-        # Ensure default folder exists
-        await storage.ensure_default_folder()
-
-        # 3. Rebuild file index from Telegram
+        # 3. Rebuild file index from Telegram (non-destructive — upserts only)
         try:
             summary = await rebuild_index(storage, db, owner="admin")
             log.info("SYSTEM: DB rebuild on startup — %s", summary)

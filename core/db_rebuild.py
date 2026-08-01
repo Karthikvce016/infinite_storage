@@ -28,102 +28,118 @@ async def rebuild_index(
     owner: str = "default",
 ) -> dict:
     """
-    Scan all TGDrive_* channels via the storage provider
-    and rebuild the file index.
+    Scan the Telegram storage channel and rebuild the file index.
+    Since all files are stored in a single Telegram channel, we scan
+    the channel directly and restore files to the default folder.
 
-    Returns a summary dict: { "folders": int, "files": int }
+    NOTE: We do NOT clear the DB first. This preserves existing records
+    if the scan fails for any reason (e.g., Telegram rate limits, network
+    issues, or channel access problems). The scan is additive/upsert only.
     """
+    from config.settings import DEFAULT_FOLDER_NAME
+
     log.info("SYSTEM: Starting DB rebuild for owner '%s'...", owner)
 
-    # Clear existing data (we'll rebuild from scratch)
-    db.clear_owner_data(owner)
+    # ── STEP 1: Ensure the default folder exists (do NOT clear DB) ──
+    channel_id = 0
+    if hasattr(storage, '_storage_channel_id') and storage._storage_channel_id:
+        channel_id = storage._storage_channel_id
 
-    folders = await storage.list_folders()
+    db.upsert_folder(FolderRecord(
+        name=DEFAULT_FOLDER_NAME,
+        channel_id=channel_id,
+        owner=owner,
+    ))
+    log.info("SYSTEM: Default folder '%s' ensured in DB", DEFAULT_FOLDER_NAME)
+
+    # ── STEP 2: Scan the storage channel directly ──
+    log.info("SYSTEM: Scanning Telegram channel for files...")
+    messages = await storage.scan_folder_messages(DEFAULT_FOLDER_NAME)
+    log.info("SYSTEM: Scan returned %d messages with media", len(messages))
+
+    if not messages:
+        log.warning("SYSTEM: No messages found in channel. Either the channel is empty, "
+                    "the bot cannot access the channel, or the channel ID is wrong.")
+        return {"folders": 1, "files": 0}
+
+    # Group chunks by filename
+    file_chunks: dict[str, dict] = defaultdict(lambda: {
+        "chunks": {},
+        "total_chunks": 0,
+        "hash": "",
+        "total_size": 0,
+    })
+
+    parsed_count = 0
+    legacy_count = 0
+    for msg_data in messages:
+        caption = msg_data["caption"]
+        parsed = parse_caption(caption)
+
+        if parsed is None:
+            # Legacy message without structured caption — use document filename
+            fname = msg_data.get("file_name")
+            if fname:
+                file_chunks[fname]["chunks"][0] = msg_data["msg_id"]
+                file_chunks[fname]["total_chunks"] = 1
+                file_chunks[fname]["hash"] = ""
+                file_chunks[fname]["total_size"] += msg_data.get("file_size", 0)
+                legacy_count += 1
+            continue
+
+        fname = parsed["filename"]
+        chunk_idx = parsed["chunk_index"]
+        total = parsed["total_chunks"]
+        file_hash = parsed["hash"]
+
+        file_chunks[fname]["chunks"][chunk_idx] = msg_data["msg_id"]
+        file_chunks[fname]["total_chunks"] = total
+        file_chunks[fname]["hash"] = file_hash
+        file_chunks[fname]["total_size"] += msg_data.get("file_size", 0)
+        parsed_count += 1
+
+    log.info("SYSTEM: Parsed %d TGDrive captions, %d legacy messages", parsed_count, legacy_count)
+
+    # Create FileRecord entries from the grouped chunks
     total_files = 0
+    skipped_files = 0
+    for filename, info in file_chunks.items():
+        expected = info["total_chunks"]
+        actual_chunks = info["chunks"]
 
-    for folder_info in folders:
-        folder_name = folder_info["name"]
-        channel_id = folder_info["channel_id"]
+        if expected == 0:
+            continue
 
-        # Save folder record
-        db.upsert_folder(FolderRecord(
-            name=folder_name,
-            channel_id=channel_id,
-            owner=owner,
-        ))
-
-        # Scan all messages in the folder via the provider
-        messages = await storage.scan_folder_messages(folder_name)
-
-        # Group chunks by filename
-        file_chunks: dict[str, dict] = defaultdict(lambda: {
-            "chunks": {},
-            "total_chunks": 0,
-            "hash": "",
-            "total_size": 0,
-        })
-
-        for msg_data in messages:
-            caption = msg_data["caption"]
-            parsed = parse_caption(caption)
-
-            if parsed is None:
-                # Legacy message without structured caption — use document filename
-                fname = msg_data.get("file_name")
-                if fname:
-                    file_chunks[fname]["chunks"][0] = msg_data["msg_id"]
-                    file_chunks[fname]["total_chunks"] = 1
-                    file_chunks[fname]["hash"] = ""
-                    file_chunks[fname]["total_size"] += msg_data.get("file_size", 0)
-                continue
-
-            fname = parsed["filename"]
-            chunk_idx = parsed["chunk_index"]
-            total = parsed["total_chunks"]
-            file_hash = parsed["hash"]
-
-            file_chunks[fname]["chunks"][chunk_idx] = msg_data["msg_id"]
-            file_chunks[fname]["total_chunks"] = total
-            file_chunks[fname]["hash"] = file_hash
-            file_chunks[fname]["total_size"] += msg_data.get("file_size", 0)
-
-        # Create FileRecord entries from the grouped chunks
-        for filename, info in file_chunks.items():
-            expected = info["total_chunks"]
-            actual_chunks = info["chunks"]
-
-            if expected == 0:
-                continue
-
-            # Check all chunks are present
-            missing = [i for i in range(expected) if i not in actual_chunks]
-            if missing:
-                log.warning(
-                    "SYSTEM: File '%s' in folder '%s' is incomplete (missing chunks: %s), skipping",
-                    filename, folder_name, missing,
-                )
-                continue
-
-            # Build ordered msg_ids list
-            msg_ids = [actual_chunks[i] for i in range(expected)]
-
-            record = FileRecord(
-                path=filename,
-                hash=info["hash"],
-                size=info["total_size"],
-                chunks=expected,
-                folder=folder_name,
-                owner=owner,
-                msg_ids=msg_ids,
+        # Check all chunks are present
+        missing = [i for i in range(expected) if i not in actual_chunks]
+        if missing:
+            log.warning(
+                "SYSTEM: File '%s' is incomplete (missing chunks: %s), skipping",
+                filename, missing,
             )
-            db.upsert_file(record)
-            total_files += 1
+            skipped_files += 1
+            continue
 
-        log.info(
-            "SYSTEM: Rebuilt folder '%s' — %d files found",
-            folder_name, sum(1 for f in file_chunks if file_chunks[f]["total_chunks"] > 0),
+        # Build ordered msg_ids list
+        msg_ids = [actual_chunks[i] for i in range(expected)]
+
+        record = FileRecord(
+            path=filename,
+            hash=info["hash"],
+            size=info["total_size"],
+            chunks=expected,
+            folder=DEFAULT_FOLDER_NAME,
+            owner=owner,
+            msg_ids=msg_ids,
         )
+        db.upsert_file(record)
+        total_files += 1
 
-    summary = {"folders": len(folders), "files": total_files}
+    log.info(
+        "SYSTEM: Rebuilt folder '%s' — %d files upserted, %d skipped",
+        DEFAULT_FOLDER_NAME, total_files, skipped_files,
+    )
+
+    summary = {"folders": 1, "files": total_files, "skipped": skipped_files}
     log.info("SYSTEM: DB rebuild complete — %s", summary)
     return summary

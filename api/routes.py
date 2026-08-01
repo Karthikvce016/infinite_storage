@@ -155,9 +155,14 @@ async def download_file(
     folder = _resolve_folder(db, folder_id, owner)
     folder_name = folder.name
 
+    log.info("SYSTEM: Download request — file_id=%s, folder=%s, owner=%s", file_id, folder_name, owner)
+
     record = db.get_file(file_id, folder_name, owner)
     if not record:
+        log.warning("SYSTEM: Download failed — file not found: %s in folder %s", file_id, folder_name)
         raise HTTPException(status_code=404, detail="File not found")
+
+    log.info("SYSTEM: Download — found record with %d chunks, msg_ids=%s", record.chunks, record.msg_ids)
 
     try:
         chunk_paths = await storage.download_file(
@@ -165,11 +170,13 @@ async def download_file(
             msg_ids=record.msg_ids,
             dest_dir=TEMP_DIR,
         )
+        log.info("SYSTEM: Download — downloaded %d chunks to temp", len(chunk_paths))
 
         # Merge chunks to temp
         merged = TEMP_DIR / Path(file_id).name
         merge_chunks(chunk_paths, merged)
         cleanup_chunks(chunk_paths)
+        log.info("SYSTEM: Download — merged chunks to %s (%d bytes)", merged, merged.stat().st_size)
 
         def file_iterator():
             with open(merged, "rb") as f:
@@ -179,6 +186,7 @@ async def download_file(
         background_tasks.add_task(cleanup_file_task, merged)
 
         safe_name = file_id.replace('"', '\\"')
+        log.info("SYSTEM: Download — streaming response for %s", safe_name)
         return StreamingResponse(
             file_iterator(),
             media_type="application/octet-stream",

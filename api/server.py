@@ -10,12 +10,15 @@ from api.routes import router as file_router
 from api.auth_routes import router as auth_router
 from api.folder_routes import router as folder_router
 
+from api.debug_routes import router as debug_router
+
 app = FastAPI(title="Telegram Drive API")
 
 # Mount API routers
 app.include_router(auth_router, prefix="/api")
 app.include_router(folder_router, prefix="/api")
 app.include_router(file_router, prefix="/api")
+app.include_router(debug_router, prefix="/api")
 
 # Mount frontend static files (must be last — catches all unmatched routes)
 frontend_dir = Path(__file__).parent.parent / "frontend"

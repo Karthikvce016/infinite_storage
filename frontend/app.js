@@ -529,9 +529,37 @@ async function uploadFile(file) {
 }
 
 // ── Download ──
-function downloadFile(fileId) {
+async function downloadFile(fileId) {
     const url = `/api/folders/${currentFolderId}/download/${encodeURIComponent(fileId)}`;
-    window.location.href = url;
+    
+    // Show a temporary status
+    const statusEl = document.createElement("div");
+    statusEl.style.cssText = "position:fixed;bottom:20px;right:20px;padding:12px 16px;background:var(--accent);color:#fff;border-radius:8px;z-index:9999;font-size:0.85rem;";
+    statusEl.textContent = `Downloading ${fileId}...`;
+    document.body.appendChild(statusEl);
+
+    try {
+        const res = await fetch(url);
+        if (!res.ok) {
+            const text = await res.text();
+            throw new Error(`Download failed: ${res.status} ${res.statusText} — ${text}`);
+        }
+        const blob = await res.blob();
+        const a = document.createElement("a");
+        a.href = URL.createObjectURL(blob);
+        a.download = fileId;
+        document.body.appendChild(a);
+        a.click();
+        a.remove();
+        URL.revokeObjectURL(a.href);
+        statusEl.textContent = `Downloaded ${fileId} ✓`;
+        statusEl.style.background = "var(--green)";
+    } catch (err) {
+        statusEl.textContent = `Error: ${err.message}`;
+        statusEl.style.background = "var(--red)";
+        console.error("Download error:", err);
+    }
+    setTimeout(() => statusEl.remove(), 4000);
 }
 
 // ── Delete ──
@@ -559,6 +587,38 @@ async function deleteFile(fileId) {
 // ══════════════════════════════════════════════
 function toggleSidebar() {
     $("sidebar").classList.toggle("open");
+}
+
+// ══════════════════════════════════════════════
+//  Rebuild Index
+// ══════════════════════════════════════════════
+async function rebuildIndex() {
+    const btn = event.target.closest('button');
+    const originalText = btn.innerHTML;
+    btn.innerHTML = `
+        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" class="spin">
+            <polyline points="23 4 23 10 17 10"/><path d="M20.49 15a9 9 0 1 1-2.12-9.36L23 10"/>
+        </svg>
+        Rebuilding...
+    `;
+    btn.disabled = true;
+
+    try {
+        const res = await fetch("/api/debug/rebuild", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+        });
+        const data = await res.json();
+        if (!res.ok) throw new Error(data.error || "Rebuild failed");
+        
+        alert(`Rebuild complete: ${data.summary.files} files, ${data.summary.folders} folders`);
+        loadFolders();
+    } catch (err) {
+        alert("Rebuild failed: " + err.message);
+    } finally {
+        btn.innerHTML = originalText;
+        btn.disabled = false;
+    }
 }
 
 // ══════════════════════════════════════════════
