@@ -19,30 +19,30 @@ let contextMenuFolderName = null;
 // ══════════════════════════════════════════════
 const $ = (id) => document.getElementById(id);
 
-const loginScreen   = $("login-screen");
-const driveScreen   = $("drive-screen");
+const loginScreen = $("login-screen");
+const driveScreen = $("drive-screen");
 const passwordInput = $("password-input");
-const loginBtn      = $("login-btn");
-const loginError    = $("login-error");
+const loginBtn = $("login-btn");
+const loginError = $("login-error");
 
-const folderList    = $("folder-list");
-const folderTitle   = $("current-folder-title");
-const filesTbody    = $("files-tbody");
-const filesTable    = $("files-table");
-const emptyState    = $("empty-state");
-const userInfo      = $("user-info");
-const dropZone      = $("drop-zone");
-const fileInput     = $("file-input");
-const progressCont  = $("upload-progress-container");
-const progressFill  = $("upload-progress-fill");
+const folderList = $("folder-list");
+const folderTitle = $("current-folder-title");
+const filesTbody = $("files-tbody");
+const filesTable = $("files-table");
+const emptyState = $("empty-state");
+const userInfo = $("user-info");
+const dropZone = $("drop-zone");
+const fileInput = $("file-input");
+const progressCont = $("upload-progress-container");
+const progressFill = $("upload-progress-fill");
 const uploadFilename = $("upload-filename");
 const uploadPercent = $("upload-percent");
-const modalOverlay  = $("modal-overlay");
-const modalInput    = $("modal-input");
-const modalTitle    = $("modal-title");
-const modalError    = $("modal-error");
-const modalConfirm  = $("modal-confirm-btn");
-const contextMenu   = $("context-menu");
+const modalOverlay = $("modal-overlay");
+const modalInput = $("modal-input");
+const modalTitle = $("modal-title");
+const modalError = $("modal-error");
+const modalConfirm = $("modal-confirm-btn");
+const contextMenu = $("context-menu");
 const breadcrumbBar = $("breadcrumb-bar");
 
 // ══════════════════════════════════════════════
@@ -58,7 +58,7 @@ document.addEventListener("DOMContentLoaded", async () => {
                 return;
             }
         }
-    } catch (_) {}
+    } catch (_) { }
     showLoginScreen();
 });
 
@@ -111,7 +111,7 @@ async function login() {
 async function logout() {
     try {
         await fetch("/api/auth/logout", { method: "POST" });
-    } catch (_) {}
+    } catch (_) { }
     passwordInput.value = "";
     showLoginScreen();
 }
@@ -539,7 +539,7 @@ async function uploadFile(file) {
 // ── Download ──
 async function downloadFile(fileId) {
     const url = `/api/folders/${currentFolderId}/download/${encodeURIComponent(fileId)}`;
-    
+
     // Show a temporary status
     const statusEl = document.createElement("div");
     statusEl.style.cssText = "position:fixed;bottom:20px;right:20px;padding:12px 16px;background:var(--accent);color:#fff;border-radius:8px;z-index:9999;font-size:0.85rem;";
@@ -598,42 +598,89 @@ function previewFile(fileId) {
 
 function openPreviewModal(fileId, previewUrl) {
     const modal = document.createElement('div');
-    modal.className = 'modal-overlay';
-    modal.style.zIndex = '2000';
+    modal.className = 'modal-overlay preview-overlay';
+    modal.style.cssText = 'position:fixed;inset:0;width:100vw;height:100vh;background:rgba(0,0,0,0.85);backdrop-filter:blur(12px);-webkit-backdrop-filter:blur(12px);display:flex;align-items:center;justify-content:center;z-index:2000;padding:16px;';
     modal.onclick = (e) => { if (e.target === modal) closePreviewModal(modal); };
 
     const ext = fileId.substring(fileId.lastIndexOf('.')).toLowerCase();
+    const isImage = ['.jpg', '.jpeg', '.png', '.gif', '.webp', '.bmp', '.ico', '.svg'].includes(ext);
     let contentHtml = '';
+    let bodyClass = '';
+    let toolbarHtml = '';
 
-    if (['.jpg', '.jpeg', '.png', '.gif', '.webp', '.bmp', '.ico'].includes(ext)) {
-        contentHtml = `<img src="${previewUrl}" alt="${escapeHtml(fileId)}" style="max-width:100%;max-height:70vh;object-fit:contain;">`;
-    } else if (['.svg'].includes(ext)) {
-        contentHtml = `<img src="${previewUrl}" alt="${escapeHtml(fileId)}" style="max-width:100%;max-height:70vh;object-fit:contain;">`;
+    if (isImage) {
+        toolbarHtml = `
+            <div class="preview-toolbar">
+                <button class="preview-tool-btn" id="preview-zoom-out" title="Zoom Out (-)">
+                    <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                        <circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/><line x1="8" y1="11" x2="14" y2="11"/>
+                    </svg>
+                </button>
+                <span class="preview-zoom-label" id="preview-zoom-label" title="Click to Reset (100%)">100%</span>
+                <button class="preview-tool-btn" id="preview-zoom-in" title="Zoom In (+)">
+                    <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                        <circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/><line x1="11" y1="8" x2="11" y2="14"/><line x1="8" y1="11" x2="14" y2="11"/>
+                    </svg>
+                </button>
+                <div class="preview-divider"></div>
+                <button class="preview-tool-btn" id="preview-zoom-fit" title="Fit to Screen / Toggle 2.5x (F)">
+                    <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                        <path d="M8 3H5a2 2 0 0 0-2 2v3m18 0V5a2 2 0 0 0-2-2h-3m0 18h3a2 2 0 0 0 2-2v-3M3 16v3a2 2 0 0 0 2 2h3"/>
+                    </svg>
+                </button>
+                <button class="preview-tool-btn" id="preview-rotate" title="Rotate 90° (R)">
+                    <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                        <path d="M21.5 2v6h-6M21.34 15.57a10 10 0 1 1-.57-8.38l5.67-5.67"/>
+                    </svg>
+                </button>
+                <button class="preview-tool-btn" id="preview-reset" title="Reset View (0)">
+                    <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                        <path d="M3 12a9 9 0 1 0 9-9 9.75 9.75 0 0 0-6.74 2.74L3 8"/><path d="M3 3v5h5"/>
+                    </svg>
+                </button>
+            </div>
+        `;
+        contentHtml = `
+            <div class="preview-image-viewport" id="preview-image-viewport" style="width:100%;height:100%;display:flex;align-items:center;justify-content:center;margin:0 auto;overflow:hidden;position:relative;cursor:grab;user-select:none;touch-action:none;">
+                <div class="preview-image-wrapper" id="preview-image-wrapper" style="width:100%;height:100%;display:flex;align-items:center;justify-content:center;margin:0 auto;text-align:center;transform-origin:center center;">
+                    <img id="preview-target-img" src="${previewUrl}" alt="${escapeHtml(fileId)}" draggable="false" style="max-width:calc(88vw - 60px);max-height:calc(88vh - 110px);width:auto;height:auto;object-fit:contain;display:block;margin:auto;border-radius:6px;box-shadow:0 16px 50px rgba(0,0,0,0.75);">
+                </div>
+                <div class="preview-hints">
+                    <span><kbd>Wheel</kbd> Zoom</span>
+                    <span><kbd>Drag</kbd> Pan</span>
+                    <span><kbd>Dbl-Click</kbd> Zoom</span>
+                    <span><kbd>F</kbd> Fit</span>
+                    <span><kbd>Esc</kbd> Close</span>
+                </div>
+            </div>
+        `;
     } else if (['.mp4', '.webm', '.mov', '.mkv'].includes(ext)) {
         contentHtml = `
-            <video controls style="max-width:100%;max-height:70vh;">
-                <source src="${previewUrl}" type="${getMediaType(ext)}">
-                Your browser does not support video playback.
-            </video>
+            <div class="preview-media-container" style="width:100%;height:100%;display:flex;align-items:center;justify-content:center;padding:24px;">
+                <video controls autoplay playsinline style="max-width:100%;max-height:100%;">
+                    <source src="${previewUrl}" type="${getMediaType(ext)}">
+                    Your browser does not support video playback.
+                </video>
+            </div>
         `;
     } else if (['.mp3', '.wav', '.ogg', '.m4a', '.flac'].includes(ext)) {
         contentHtml = `
-            <audio controls style="width:100%;max-width:500px;">
-                <source src="${previewUrl}" type="${getMediaType(ext)}">
-                Your browser does not support audio playback.
-            </audio>
+            <div class="preview-media-container" style="width:100%;height:100%;display:flex;align-items:center;justify-content:center;padding:24px;">
+                <audio controls autoplay style="width:100%;max-width:520px;">
+                    <source src="${previewUrl}" type="${getMediaType(ext)}">
+                    Your browser does not support audio playback.
+                </audio>
+            </div>
         `;
     } else if (['.pdf'].includes(ext)) {
         contentHtml = `
-            <iframe src="${previewUrl}" style="width:100%;height:70vh;border:none;border-radius:var(--radius-md);"></iframe>
+            <iframe class="preview-pdf-iframe" src="${previewUrl}" style="width:100%;height:100%;border:none;"></iframe>
         `;
     } else if (['.txt', '.md', '.json', '.xml', '.html', '.css', '.js'].includes(ext)) {
+        bodyClass = 'scrollable';
         contentHtml = `
-            <pre style="max-height:70vh;overflow:auto;padding:16px;background:var(--surface);border-radius:var(--radius-md);font-size:0.85rem;line-height:1.6;white-space:pre-wrap;word-wrap:break-word;">
-                <code id="preview-text-content">Loading...</code>
-            </pre>
+            <pre class="preview-code-container"><code id="preview-text-content">Loading...</code></pre>
         `;
-        // Fetch text content
         fetch(previewUrl)
             .then(r => r.text())
             .then(text => {
@@ -647,36 +694,291 @@ function openPreviewModal(fileId, previewUrl) {
     }
 
     modal.innerHTML = `
-        <div class="modal-card preview-modal" style="max-width:90vw;max-height:90vh;padding:0;overflow:hidden;" onclick="event.stopPropagation()">
-            <div class="modal-header" style="display:flex;align-items:center;justify-content:space-between;padding:16px 24px;border-bottom:1px solid var(--surface-border);background:var(--surface);">
-                <h3 style="font-size:1rem;font-weight:600;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;max-width:calc(100% - 100px);">${escapeHtml(fileId)}</h3>
-                <div style="display:flex;gap:8px;">
+        <div class="preview-dialog" style="display:flex;flex-direction:column;width:88vw;max-width:1600px;height:88vh;max-height:94vh;padding:0;margin:auto;overflow:hidden;background:var(--bg-primary);border:1px solid var(--surface-border);border-radius:var(--radius-xl);box-shadow:var(--shadow-lg),0 0 70px rgba(0,0,0,0.85);" onclick="event.stopPropagation()">
+            <div class="modal-header">
+                <div class="preview-header-left">
+                    <span class="preview-badge">${escapeHtml(ext.replace('.', '') || 'FILE')}</span>
+                    <h3 class="preview-title" title="${escapeAttr(fileId)}">${escapeHtml(fileId)}</h3>
+                </div>
+                ${toolbarHtml}
+                <div class="preview-header-actions">
                     <button class="btn-secondary btn-sm" onclick="downloadFile('${escapeAttr(fileId)}')">
-                        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                        <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
                             <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="17 8 12 3 7 8"/><line x1="12" y1="3" x2="12" y2="15"/>
                         </svg>
                         Download
                     </button>
-                    <button class="btn-icon" onclick="closePreviewModal(this.closest('.modal-overlay'))" title="Close">
+                    <button class="btn-icon" onclick="closePreviewModal(this.closest('.modal-overlay'))" title="Close (Esc)">
                         <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
                             <line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/>
                         </svg>
                     </button>
                 </div>
             </div>
-            <div class="modal-body" style="padding:24px;overflow:auto;max-height:calc(90vh - 80px);background:var(--bg-secondary);">
+            <div class="modal-body ${bodyClass}" style="flex:1 1 0%;min-height:0;width:100%;height:100%;display:flex;align-items:center;justify-content:center;margin:0;padding:0;overflow:hidden;position:relative;background:radial-gradient(circle at 50% 50%,#151522 0%,#08080c 100%);text-align:center;">
                 ${contentHtml}
             </div>
         </div>
     `;
 
     document.body.appendChild(modal);
-    // Trigger animation
     requestAnimationFrame(() => modal.style.opacity = '1');
+
+    // Initialize interactive Zoom & Pan if image
+    if (isImage) {
+        const viewport = modal.querySelector('#preview-image-viewport');
+        const wrapper = modal.querySelector('#preview-image-wrapper');
+        const label = modal.querySelector('#preview-zoom-label');
+        const btnIn = modal.querySelector('#preview-zoom-in');
+        const btnOut = modal.querySelector('#preview-zoom-out');
+        const btnFit = modal.querySelector('#preview-zoom-fit');
+        const btnReset = modal.querySelector('#preview-reset');
+        const btnRotate = modal.querySelector('#preview-rotate');
+
+        modal._cleanup = setupImageZoomPan({
+            modal,
+            viewport,
+            wrapper,
+            label,
+            btnIn,
+            btnOut,
+            btnFit,
+            btnReset,
+            btnRotate,
+        });
+    } else {
+        const onKeyDown = (e) => {
+            if (e.key === 'Escape') closePreviewModal(modal);
+        };
+        window.addEventListener('keydown', onKeyDown);
+        modal._cleanup = () => window.removeEventListener('keydown', onKeyDown);
+    }
+}
+
+function setupImageZoomPan({ modal, viewport, wrapper, label, btnIn, btnOut, btnFit, btnReset, btnRotate }) {
+    let scale = 1.0;
+    const minScale = 0.15;
+    const maxScale = 10.0;
+    let posX = 0;
+    let posY = 0;
+    let rotation = 0;
+    let isDragging = false;
+    let startX = 0;
+    let startY = 0;
+    let initialPinchDist = 0;
+    let initialPinchScale = 1.0;
+
+    function applyTransform(animate = false) {
+        if (animate) {
+            wrapper.classList.remove('no-transition');
+        } else {
+            wrapper.classList.add('no-transition');
+        }
+        wrapper.style.transform = `translate3d(${posX}px, ${posY}px, 0) scale(${scale}) rotate(${rotation}deg)`;
+        if (label) {
+            label.textContent = `${Math.round(scale * 100)}%`;
+        }
+    }
+
+    function zoomBy(factor, clientX, clientY, animate = true) {
+        const oldScale = scale;
+        const newScale = Math.min(maxScale, Math.max(minScale, oldScale * factor));
+        if (Math.abs(newScale - oldScale) < 0.001) return;
+
+        if (clientX !== undefined && clientY !== undefined && viewport) {
+            const rect = viewport.getBoundingClientRect();
+            const centerViewportX = rect.left + rect.width / 2;
+            const centerViewportY = rect.top + rect.height / 2;
+            const relX = clientX - centerViewportX;
+            const relY = clientY - centerViewportY;
+
+            // Zoom centered precisely on mouse pointer
+            posX = relX - (relX - posX) * (newScale / oldScale);
+            posY = relY - (relY - posY) * (newScale / oldScale);
+        } else {
+            posX = posX * (newScale / oldScale);
+            posY = posY * (newScale / oldScale);
+        }
+
+        scale = newScale;
+        applyTransform(animate);
+    }
+
+    function resetView(animate = true) {
+        scale = 1.0;
+        posX = 0;
+        posY = 0;
+        rotation = 0;
+        applyTransform(animate);
+    }
+
+    function toggleFitOrZoom(clientX, clientY) {
+        if (Math.abs(scale - 1.0) > 0.1 || posX !== 0 || posY !== 0) {
+            resetView(true);
+        } else {
+            zoomBy(2.5, clientX, clientY, true);
+        }
+    }
+
+    function rotate(animate = true) {
+        rotation = (rotation + 90) % 360;
+        applyTransform(animate);
+    }
+
+    // Button event listeners
+    if (btnIn) btnIn.onclick = () => zoomBy(1.3, undefined, undefined, true);
+    if (btnOut) btnOut.onclick = () => zoomBy(1 / 1.3, undefined, undefined, true);
+    if (btnReset) btnReset.onclick = () => resetView(true);
+    if (label) label.onclick = () => resetView(true);
+    if (btnFit) btnFit.onclick = () => toggleFitOrZoom();
+    if (btnRotate) btnRotate.onclick = () => rotate(true);
+
+    // Mouse Wheel zoom
+    const onWheel = (e) => {
+        e.preventDefault();
+        const factor = e.deltaY < 0 ? 1.15 : 0.87;
+        zoomBy(factor, e.clientX, e.clientY, false);
+    };
+    viewport.addEventListener('wheel', onWheel, { passive: false });
+
+    // Double Click
+    const onDblClick = (e) => {
+        e.preventDefault();
+        toggleFitOrZoom(e.clientX, e.clientY);
+    };
+    viewport.addEventListener('dblclick', onDblClick);
+
+    // Mouse Drag / Pan
+    const onMouseDown = (e) => {
+        if (e.button !== 0) return;
+        isDragging = true;
+        startX = e.clientX - posX;
+        startY = e.clientY - posY;
+        viewport.classList.add('is-dragging');
+        wrapper.classList.add('no-transition');
+        e.preventDefault();
+    };
+    viewport.addEventListener('mousedown', onMouseDown);
+
+    const onMouseMove = (e) => {
+        if (!isDragging) return;
+        posX = e.clientX - startX;
+        posY = e.clientY - startY;
+        applyTransform(false);
+    };
+    window.addEventListener('mousemove', onMouseMove);
+
+    const onMouseUp = () => {
+        if (isDragging) {
+            isDragging = false;
+            viewport.classList.remove('is-dragging');
+        }
+    };
+    window.addEventListener('mouseup', onMouseUp);
+
+    // Touch support (Pinch zoom & touch pan)
+    const onTouchStart = (e) => {
+        if (e.touches.length === 1) {
+            isDragging = true;
+            startX = e.touches[0].clientX - posX;
+            startY = e.touches[0].clientY - posY;
+            wrapper.classList.add('no-transition');
+        } else if (e.touches.length === 2) {
+            isDragging = false;
+            const dx = e.touches[0].clientX - e.touches[1].clientX;
+            const dy = e.touches[0].clientY - e.touches[1].clientY;
+            initialPinchDist = Math.hypot(dx, dy);
+            initialPinchScale = scale;
+        }
+    };
+
+    const onTouchMove = (e) => {
+        if (e.touches.length === 1 && isDragging) {
+            e.preventDefault();
+            posX = e.touches[0].clientX - startX;
+            posY = e.touches[0].clientY - startY;
+            applyTransform(false);
+        } else if (e.touches.length === 2 && initialPinchDist > 0) {
+            e.preventDefault();
+            const dx = e.touches[0].clientX - e.touches[1].clientX;
+            const dy = e.touches[0].clientY - e.touches[1].clientY;
+            const dist = Math.hypot(dx, dy);
+            const midX = (e.touches[0].clientX + e.touches[1].clientX) / 2;
+            const midY = (e.touches[0].clientY + e.touches[1].clientY) / 2;
+            const factor = (dist / initialPinchDist) * (initialPinchScale / scale);
+            zoomBy(factor, midX, midY, false);
+        }
+    };
+
+    const onTouchEnd = () => {
+        isDragging = false;
+        initialPinchDist = 0;
+    };
+
+    viewport.addEventListener('touchstart', onTouchStart, { passive: false });
+    viewport.addEventListener('touchmove', onTouchMove, { passive: false });
+    viewport.addEventListener('touchend', onTouchEnd);
+
+    // Keyboard Shortcuts
+    const onKeyDown = (e) => {
+        if (e.target && (e.target.tagName === 'INPUT' || e.target.tagName === 'TEXTAREA')) return;
+
+        if (e.key === 'Escape') {
+            closePreviewModal(modal);
+        } else if (e.key === '+' || e.key === '=') {
+            e.preventDefault();
+            zoomBy(1.3, undefined, undefined, true);
+        } else if (e.key === '-' || e.key === '_') {
+            e.preventDefault();
+            zoomBy(1 / 1.3, undefined, undefined, true);
+        } else if (e.key === '0' || e.key === 'f' || e.key === 'F') {
+            e.preventDefault();
+            resetView(true);
+        } else if (e.key === 'r' || e.key === 'R') {
+            e.preventDefault();
+            rotate(true);
+        } else if (e.key === 'ArrowLeft') {
+            e.preventDefault();
+            posX += 40;
+            applyTransform(true);
+        } else if (e.key === 'ArrowRight') {
+            e.preventDefault();
+            posX -= 40;
+            applyTransform(true);
+        } else if (e.key === 'ArrowUp') {
+            e.preventDefault();
+            posY += 40;
+            applyTransform(true);
+        } else if (e.key === 'ArrowDown') {
+            e.preventDefault();
+            posY -= 40;
+            applyTransform(true);
+        }
+    };
+    window.addEventListener('keydown', onKeyDown);
+
+    // Initial transform
+    applyTransform(false);
+
+    // Return cleanup function
+    return () => {
+        window.removeEventListener('mousemove', onMouseMove);
+        window.removeEventListener('mouseup', onMouseUp);
+        window.removeEventListener('keydown', onKeyDown);
+        viewport.removeEventListener('wheel', onWheel);
+        viewport.removeEventListener('dblclick', onDblClick);
+        viewport.removeEventListener('mousedown', onMouseDown);
+        viewport.removeEventListener('touchstart', onTouchStart);
+        viewport.removeEventListener('touchmove', onTouchMove);
+        viewport.removeEventListener('touchend', onTouchEnd);
+    };
 }
 
 function closePreviewModal(modal) {
     if (!modal) return;
+    if (typeof modal._cleanup === 'function') {
+        try { modal._cleanup(); } catch (_) { }
+    }
     modal.style.opacity = '0';
     setTimeout(() => modal.remove(), 200);
 }
@@ -744,7 +1046,7 @@ async function rebuildIndex() {
         });
         const data = await res.json();
         if (!res.ok) throw new Error(data.error || "Rebuild failed");
-        
+
         alert(`Rebuild complete: ${data.summary.files} files, ${data.summary.folders} folders`);
         loadFolders();
     } catch (err) {
