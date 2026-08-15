@@ -51,10 +51,15 @@ async def _download_single(
                     progress_callback=progress_cb,
                 )
 
-            # Telethon may append the file extension (e.g. chunk_0 -> chunk_0.pdf)
-            # Use the actual returned path instead of our expected path
-            actual_path = Path(actual_path) if actual_path else out_path
+            # download_media returns the actual file path (Telethon may
+            # append an extension like .jpg), so we must use the return
+            # value instead of out_path.
+            if actual_path is None:
+                raise FileNotFoundError(
+                    f"download_media returned None for msg_id={msg_id}"
+                )
 
+            actual_path = Path(actual_path)
             log.info("Downloaded msg_id=%d → %s", msg_id, actual_path.name)
             return actual_path
 
