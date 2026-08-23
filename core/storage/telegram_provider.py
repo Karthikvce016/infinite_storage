@@ -67,31 +67,60 @@ class TelegramProvider(StorageProvider):
 
     # ── Connection ─────────────────────────────────────────
     async def connect(self) -> None:
-        """Connect to Telegram using the bot token.
-        We will use a SINGLE storage channel for all files.
-        """
-        if not BOT_TOKEN:
-            raise RuntimeError(
-                "BOT_TOKEN is not set. "
-                "Create a bot via @BotFather and set BOT_TOKEN in your .env file."
-            )
+        """Connect to Telegram.
 
-        log.info("SYSTEM: Connecting to Telegram as a bot...")
+        Priority:
+        1. SESSION_STRING — a user session string (full API access, including
+           GetHistoryRequest so DB rebuild / scan can read channel history).
+        2. BOT_TOKEN — a bot token (limited API; can upload/delete/send but
+           not scan channel history).
+
+        We always create a TelegramClient first, then try the connection
+        method that applies. If both are missing we raise.
+        """
         self.client = TelegramClient(
             StringSession(), API_ID, API_HASH
         )
 
-        # Handle FloodWait — Telegram rate-limits repeated connections
-        try:
+        # Resolve STORAGE_CHANNEL_ID early so the access hash is cached
+        # and can be used in all subsequent calls.
+        _channel_id = None
+        if STORAGE_CHANNEL_ID:
+            stripped = STORAGE_CHANNEL_ID.strip()
+            try:
+                if stripped.lstrip("-").isdigit():
+                    _channel_id = int(stripped)
+                    await self._resolve_channel(_channel_id)
+                else:
+                    entity = await self.client.get_entity(stripped)
+                    _channel_id = entity.id
+            except Exception as exc:
+                log.error(
+                    "SYSTEM: Failed to resolve STORAGE_CHANNEL_ID=%s — %s",
+                    STORAGE_CHANNEL_ID, exc,
+                )
+
+        # Connection attempt.
+        if SESSION_STRING.strip():
+            log.info("SYSTEM: Connecting to Telegram with user session...")
+            try:
+                session_obj = StringSession(SESSION_STRING)
+                await self.client.start(session_obj)
+                log.info("SYSTEM: User session loaded successfully")
+            except Exception as sess_err:
+                log.warning(
+                    "SYSTEM: User session failed (%s), falling back to BOT_TOKEN...",
+                    sess_err,
+                )
+                await self.client.start(bot_token=BOT_TOKEN)
+        elif BOT_TOKEN:
+            log.info("SYSTEM: Connecting to Telegram as a bot...")
             await self.client.start(bot_token=BOT_TOKEN)
-        except FloodWaitError as e:
-            log.warning(
-                "SYSTEM: Telegram rate limit — waiting %d seconds before retry...",
-                e.seconds,
+        else:
+            raise RuntimeError(
+                "Neither SESSION_STRING nor BOT_TOKEN is set. "
+                "Set one of them in your .env file."
             )
-            import asyncio
-            await asyncio.sleep(e.seconds)
-            await self.client.start(bot_token=BOT_TOKEN)
 
         # Force the bot to learn about all channels/dialogs so that
         # channel access hashes are cached before any scan/iterate calls.

@@ -15,7 +15,7 @@ from contextlib import asynccontextmanager
 
 import uvicorn
 
-from config.settings import API_ID, API_HASH, BOT_TOKEN, DATABASE_URL, STORAGE_CHANNEL_ID
+from config.settings import API_ID, API_HASH, BOT_TOKEN, DATABASE_URL, STORAGE_CHANNEL_ID, SESSION_STRING
 from storage.database import Database
 from core.storage.telegram_provider import TelegramProvider
 from core.db_rebuild import rebuild_index
@@ -88,17 +88,29 @@ def main() -> None:
         )
         sys.exit(1)
 
-    if not BOT_TOKEN:
+    if not BOT_TOKEN and not SESSION_STRING:
         print(
-            "\n⚠  Bot token missing.\n"
-            "   1. Talk to @BotFather on Telegram and create a bot.\n"
-            "   2. Copy the token and set BOT_TOKEN in your .env file.\n"
-            "   3. Add the bot as an admin to your private storage channel.\n"
-            "   4. Set STORAGE_CHANNEL_ID in .env (the channel's numeric ID).\n"
+            "\n⚠  No Telegram auth configured.\n"
+            "   Choose one of these approaches and set the matching env var in .env:\n\n"
+            "   A) Bot mode (decommended for 24x7 services like Render):\n"
+            "      1. Talk to @BotFather on Telegram and create a bot.\n"
+            "      2. Copy the token to BOT_TOKEN in .env.\n"
+            "      3. Add the bot as an admin to your private storage channel.\n"
+            "      4. Set STORAGE_CHANNEL_ID in .env (the channel's numeric ID).\n"
+            "      Note: a bot CAN upload/download/delete files but CANNOT scan\n"
+            "      the channel's message history. New files uploaded after deploy\n"
+            "      will appear in the index; old files need a manual 'Rebuild'\n"
+            "      using a one-off user session if you still have one.\n\n"
+            "   B) User session mode (full API, can scan history, but sessions\n"
+            "      expire and need periodic re-authentication):\n"
+            "      1. Generate a session string: python generate_session.py\n"
+            "      2. Copy the SESSION_STRING into .env.\n"
+            "      3. Set STORAGE_CHANNEL_ID in .env.\n"
+            "      Note: with a user session the DB rebuild works end-to-end.\n"
         )
         sys.exit(1)
 
-    if not STORAGE_CHANNEL_ID:
+    if STORAGE_CHANNEL_ID:
         print(
             "\n⚠  Storage channel missing.\n"
             "   1. Create a private channel in Telegram (this is where files are stored).\n"
