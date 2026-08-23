@@ -15,7 +15,7 @@ from contextlib import asynccontextmanager
 
 import uvicorn
 
-from config.settings import API_ID, API_HASH, BOT_TOKEN, DATABASE_URL
+from config.settings import API_ID, API_HASH, BOT_TOKEN, DATABASE_URL, STORAGE_CHANNEL_ID
 from storage.database import Database
 from core.storage.telegram_provider import TelegramProvider
 from core.db_rebuild import rebuild_index
@@ -95,6 +95,17 @@ def main() -> None:
             "   2. Copy the token and set BOT_TOKEN in your .env file.\n"
             "   3. Add the bot as an admin to your private storage channel.\n"
             "   4. Set STORAGE_CHANNEL_ID in .env (the channel's numeric ID).\n"
+        )
+        sys.exit(1)
+
+    if not STORAGE_CHANNEL_ID:
+        print(
+            "\n⚠  Storage channel missing.\n"
+            "   1. Create a private channel in Telegram (this is where files are stored).\n"
+            "   2. Add your bot as an admin of that channel.\n"
+            "   3. Forward any message from the channel to @userinfobot to get its ID\n"
+            "      (private channel IDs look like -1001234567890).\n"
+            "   4. Set STORAGE_CHANNEL_ID in your .env file.\n"
         )
         sys.exit(1)
 

@@ -1,98 +1,89 @@
 # Telegram Drive
 
-A web application that provides Google-Drive-like file storage using a private Telegram channel as backend storage.
+A self-hosted, Google-Drive-style file storage web app that uses **one private Telegram channel** as its storage backend.
 
-## Features
+## How it works
 
-- **Automatic chunking** — large files are split into ≤ 1.9 GB chunks to respect Telegram limits
-- **Parallel uploads** — chunks are uploaded concurrently (semaphore-limited) for speed
-- **Two-step upload optimisation** — `upload_file()` + `send_file()` for faster throughput
-- **SHA-256 change detection** — only changed files are re-uploaded
-- **SQLite/PostgreSQL index** — maps local files to Telegram message IDs
-- **Restore system** — download and merge all files on a new machine
-- **FloodWait handling** — automatic sleep & retry on Telegram rate limits
-- **FastAPI Web Backend** — REST API with upload, download, list, and delete endpoints
-- **Responsive Web UI** — works on desktop and mobile browsers
+- All files are stored as documents in a **single private Telegram channel** (the bot must be an admin there).
+- Files larger than `CHUNK_SIZE` (20 MB) are split into chunks; each chunk is uploaded as a separate message with a structured caption:
+  `TGDrive|<filename>|<chunk_index>|<total_chunks>|<sha256_hash>`
+- Folders are **logical only** (rows in the index DB) — they do *not* create separate Telegram channels. Every folder's chunks live in the same storage channel, tagged by caption.
+- A SQLite/PostgreSQL index maps each file (per folder + owner) to its ordered list of Telegram message IDs.
+- On startup (and via the "Rebuild Index" button) the app rescans the channel and reconstructs the index from captions — so a wiped/ephemeral disk loses nothing but the DB, which rebuilds itself.
 
-## Project Structure
+## Project structure
 
 ```
 infinite_storage/
-├── main.py
+├── main.py                  # Entry point: pre-flight checks, lifespan, uvicorn
 ├── requirements.txt
-├── Procfile
-├── .env.example
-├── README.md
+├── Procfile                 # web: python main.py
+├── .env.example             # Copy to .env and fill in
 ├── api/
-│   ├── __init__.py
-│   ├── server.py          # FastAPI app setup & static file mount
-│   └── routes.py          # REST endpoints
+│   ├── server.py            # FastAPI app, CORS, static frontend mount
+│   ├── auth_routes.py       # Password login → JWT cookie session
+│   ├── folder_routes.py     # Folder CRUD (hierarchical, logical folders)
+│   ├── routes.py            # Upload / download / preview / delete endpoints
+│   └── debug_routes.py      # /api/debug/status, /api/debug/rebuild, download-test
 ├── config/
-│   ├── __init__.py
-│   └── settings.py        # Env-var driven configuration
+│   └── settings.py          # Env-var driven configuration
 ├── core/
-│   ├── __init__.py
-│   ├── telegram_client.py
-│   ├── uploader.py
-│   ├── downloader.py
-│   ├── chunk_manager.py
-│   ├── crypto_manager.py
-│   ├── file_watcher.py
-│   └── sync_manager.py
-├── frontend/
-│   ├── index.html
-│   ├── upload.js
-│   └── styles.css
+│   ├── chunk_manager.py     # Split / merge / SHA-256 hashing
+│   ├── uploader.py          # Rate-limited chunk upload + caption format
+│   ├── downloader.py        # Rate-limited chunk download
+│   ├── rate_limiter.py      # Token-bucket limiter + FloodWait handling
+│   ├── db_rebuild.py        # Reconstruct index from channel captions
+│   └── storage/
+│       ├── base.py          # StorageProvider interface
+│       └── telegram_provider.py  # Telegram (Telethon/MTProto) implementation
 ├── storage/
-│   ├── __init__.py
-│   └── database.py
-└── ui/                    # Legacy desktop UI (not used by web backend)
+│   └── database.py          # SQLAlchemy models + Database wrapper
+└── frontend/                # Single-page UI (served at /)
+    ├── index.html
+    ├── app.js
+    └── styles.css
 ```
 
 ## Setup
 
-### 1. Get Telegram API credentials
+### 1. Get Telegram credentials
 
-1. Visit <https://my.telegram.org> and log in.
-2. Go to **API development tools** → create a new application.
-3. Note your **API ID** (integer) and **API Hash** (string).
+1. Visit <https://my.telegram.org> → **API development tools** → create an app. Note the **API_ID** and **API_HASH**.
+2. Talk to **@BotFather** → `/newbot` → copy the **BOT_TOKEN**.
+3. Create a **private channel** in Telegram (this is your storage).
+4. Add the bot to the channel **as an admin** (with post/delete permissions).
+5. Get the channel's numeric ID: forward any message from the channel to **@userinfobot** (IDs look like `-1001234567890`).
 
 ### 2. Install dependencies
 
 ```bash
 cd infinite_storage
 python3 -m venv venv
-source venv/bin/activate   # On Windows: venv\Scripts\activate
+source venv/bin/activate        # Windows: venv\Scripts\activate
 pip install -r requirements.txt
 ```
 
-### 3. Configure Environment Variables
-
-Copy the example file and fill in your credentials:
+### 3. Configure environment
 
 ```bash
 cp .env.example .env
+# then edit .env — required keys: API_ID, API_HASH, BOT_TOKEN, STORAGE_CHANNEL_ID
 ```
 
-Then edit `.env`:
+| Variable | Required | Description |
+|---|---|---|
+| `API_ID` | ✅ | Telegram API ID from https://my.telegram.org |
+| `API_HASH` | ✅ | Telegram API Hash |
+| `BOT_TOKEN` | ✅ | Bot token from @BotFather (bot must be channel admin) |
+| `STORAGE_CHANNEL_ID` | ✅ | Numeric ID of the private storage channel (e.g. `-1001234567890`) |
+| `APP_PASSWORD` | No | Web UI password (**default: `admin`** — set your own!) |
+| `DATABASE_URL` | No | PostgreSQL URL; omit for local SQLite (`index.db`) |
+| `ALLOWED_ORIGINS` | No | Comma-separated origins for CORS (only if UI is served from another origin) |
+| `RATE_LIMIT_DELAY` | No | Min seconds between Telegram API calls (default `2.0`) |
+| `MAX_REQUESTS_PER_MINUTE` | No | Token-bucket cap (default `20`) |
+| `PORT` | No | Server port (default `8000`; hosting platforms set it automatically) |
 
-```
-API_ID=12345678
-API_HASH=your_api_hash_here
-CHANNEL_NAME=TelegramDriveStorage
-SESSION_NAME=telegram_drive_session
-```
-
-| Variable        | Required | Description                                       |
-|-----------------|----------|---------------------------------------------------|
-| `API_ID`        | ✅       | Telegram API ID from https://my.telegram.org      |
-| `API_HASH`      | ✅       | Telegram API Hash                                  |
-| `CHANNEL_NAME`  | No       | Channel name for storage (default: `TelegramDriveStorage`) |
-| `SESSION_NAME`  | No       | Telethon session file name (default: `telegram_drive_session`) |
-| `PORT`          | No       | Server port (default: `8000`)                      |
-| `PASSPHRASE`    | No       | AES encryption passphrase                          |
-
-> **⚠ Never commit your `.env` file.** It is already listed in `.gitignore`.
+> **⚠ Never commit your `.env`** — it holds your bot token and account credentials.
 
 ### 4. Run
 
@@ -100,27 +91,40 @@ SESSION_NAME=telegram_drive_session
 python main.py
 ```
 
-Open <http://localhost:8000> in your browser to access the web UI.
+Open <http://localhost:8000>, log in with `APP_PASSWORD`, create a folder, and upload.
 
-### 5. Deploy to Cloud (Railway / Render)
+### 5. Deploy (Railway / Render)
 
-1. Push your repository to GitHub.
-2. Connect the repository on your hosting platform.
-3. Set the required environment variables (`API_ID`, `API_HASH`, etc.) in the platform dashboard.
-4. The `Procfile` (`web: python main.py`) tells the platform how to start the app.
-5. The server automatically binds to the `PORT` provided by the platform.
+1. Push the repo to GitHub (`.gitignore` already excludes `venv/`, `.env`, `index.db`, `tmp/`, sessions).
+2. Connect the repo on your hosting platform.
+3. Set the required env vars (`API_ID`, `API_HASH`, `BOT_TOKEN`, `STORAGE_CHANNEL_ID`, `APP_PASSWORD`, optionally `DATABASE_URL`) in the dashboard.
+4. The `Procfile` (`web: python main.py`) starts the app; it binds to the platform-provided `PORT`.
+5. On ephemeral free tiers, set `DATABASE_URL` — otherwise the index DB resets per deploy (files stay safe in Telegram; hit **Rebuild Index** to restore the index).
+
+## API overview
+
+All `/api` endpoints except `/api/auth/*` require the session cookie (login via `POST /api/auth/login` with `{"password": "..."}`).
+
+| Method & path | Purpose |
+|---|---|
+| `POST /api/auth/login` · `POST /api/auth/logout` · `GET /api/auth/check` | Session management |
+| `GET /api/folders?parent_id=` · `POST /api/folders` | List / create (hierarchical) folders |
+| `GET /api/folders/{id}/path` | Breadcrumb path |
+| `PUT /api/folders/{id}` · `DELETE /api/folders/{id}` | Rename / delete folder (recursive) |
+| `GET /api/folders/{id}/files` | List files in folder |
+| `POST /api/folders/{id}/upload` | Multipart upload (`file`, optional `alias`) |
+| `GET /api/folders/{id}/download/{file_id}` | Download (streams merged chunks) |
+| `GET /api/folders/{id}/preview/{file_id}` | Inline preview (images/video/audio/PDF/text) |
+| `DELETE /api/folders/{id}/files/{file_id}` | Delete file (Telegram messages + DB row) |
+| `GET /api/debug/status` · `POST /api/debug/rebuild` | Diagnostics / manual index rebuild |
 
 ## Libraries
 
-| Library          | Purpose                         |
-|------------------|----------------------------------|
-| telethon         | Telegram MTProto client          |
-| watchdog         | Filesystem event monitoring      |
-| fastapi          | REST API framework               |
-| uvicorn          | ASGI server                      |
-| python-dotenv    | Load `.env` files                |
-| aiofiles         | Async file I/O                   |
-| sqlite3          | Local index database (stdlib)    |
-| hashlib          | SHA-256 hashing (stdlib)         |
-| asyncio          | Async orchestration (stdlib)     |
-
+| Library | Purpose |
+|---|---|
+| telethon | Telegram MTProto client (bot login, chunk upload/download) |
+| FastAPI + uvicorn | REST API + ASGI server |
+| SQLAlchemy (+ asyncpg / psycopg2-binary) | Postgres index; SQLite fallback |
+| PyJWT | Signed session cookies |
+| python-dotenv | Load `.env` |
+| aiofiles, python-multipart | Async I/O and multipart uploads |

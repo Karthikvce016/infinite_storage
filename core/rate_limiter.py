@@ -61,7 +61,7 @@ class RateLimiter:
             # Wait for token availability
             while self._tokens < 1.0:
                 wait_time = (1.0 - self._tokens) / (self._max_per_minute / 60.0)
-                log.info(
+                log.debug(
                     "SYSTEM: Rate limiter — bucket empty, waiting %.1fs for token replenish "
                     "(total calls: %d, total waits: %d)",
                     wait_time, self._total_calls, self._total_waits,

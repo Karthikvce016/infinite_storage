@@ -503,6 +503,8 @@ async function uploadFile(file) {
                     progressFill.style.width = "100%";
                     uploadPercent.textContent = "100%";
                     uploadFilename.textContent = `Uploaded ${file.name} ✓`;
+                    // Refresh only once the server has actually confirmed the upload
+                    loadFiles();
                     resolve();
                 } else {
                     try {
@@ -1029,7 +1031,9 @@ function toggleSidebar() {
 //  Rebuild Index
 // ══════════════════════════════════════════════
 async function rebuildIndex() {
-    const btn = event.target.closest('button');
+    // Use the stable button reference instead of the implicit global `event`,
+    // which is undefined when this runs outside a direct user-gesture stack.
+    const btn = document.getElementById("rebuild-index-btn");
     const originalText = btn.innerHTML;
     btn.innerHTML = `
         <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" class="spin">
@@ -1075,5 +1079,13 @@ function escapeHtml(text) {
 }
 
 function escapeAttr(text) {
-    return text.replace(/'/g, "\\'").replace(/"/g, '\\"');
+    // Escapes for safe interpolation into a double-quoted HTML attribute.
+    // & first so we don't double-encode the entities below; then quotes and
+    // angle brackets (covers both attribute context and inline JS-in-attr).
+    return String(text)
+        .replace(/&/g, "&amp;")
+        .replace(/"/g, "&quot;")
+        .replace(/'/g, "&#39;")
+        .replace(/</g, "&lt;")
+        .replace(/>/g, "&gt;");
 }

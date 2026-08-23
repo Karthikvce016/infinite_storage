@@ -9,6 +9,7 @@ import shutil
 import logging
 from pathlib import Path
 from typing import Optional
+from uuid import uuid4
 
 from fastapi import APIRouter, UploadFile, File, Form, Request, HTTPException, BackgroundTasks
 from fastapi.responses import StreamingResponse
@@ -21,6 +22,19 @@ from storage.database import FileRecord
 log = logging.getLogger(__name__)
 
 router = APIRouter()
+
+
+def _sanitize_filename(name: str) -> str:
+    """Strip any directory components from a client-supplied filename.
+
+    Uploads are written under TEMP_DIR using the raw filename; without this,
+    a crafted name like "../../main.py" (or an absolute path) escapes the
+    temp dir. Backslashes are normalised first so Windows-style paths from
+    browsers can't sneak through either.
+    """
+    name = (name or "").replace("\\", "/")
+    name = name.split("/")[-1].strip().lstrip(".")
+    return name or "upload"
 
 
 def _get_context(request: Request):
@@ -52,8 +66,13 @@ async def upload_file(
     folder = _resolve_folder(db, folder_id, owner)
     folder_name = folder.name
 
-    # Save to temp locally
-    temp_file_path = TEMP_DIR / file.filename
+    # Never trust client-supplied filenames — strip directory components so
+    # something like "../../main.py" can't escape the temp directory.
+    safe_name = _sanitize_filename(file.filename)
+
+    # Save to a collision-proof temp file (two users uploading "report.pdf"
+    # at the same time must not overwrite each other's temp file).
+    temp_file_path = TEMP_DIR / f"upload_{uuid4().hex}_{safe_name}"
     try:
         with open(temp_file_path, "wb") as buffer:
             shutil.copyfileobj(file.file, buffer)
@@ -64,13 +83,13 @@ async def upload_file(
 
     # Use alias if provided, preserving the original file extension
     if alias and alias.strip():
-        original_ext = Path(file.filename).suffix
-        alias_name = alias.strip()
+        original_ext = Path(safe_name).suffix
+        alias_name = _sanitize_filename(alias)
         if not Path(alias_name).suffix:
             alias_name += original_ext
         rel_path = alias_name
     else:
-        rel_path = file.filename
+        rel_path = safe_name
 
     new_hash = compute_hash(temp_file_path)
     chunk_paths = []
