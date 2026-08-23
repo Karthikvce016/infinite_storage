@@ -3,128 +3,184 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Telegram Drive</title>
+    <title>Telegram Drive — Obsidian Vault</title>
     <meta name="description" content="Personal cloud storage powered by Telegram. Upload, organize, and access your files from anywhere.">
-    <link rel="stylesheet" href="/styles.css?v=11">
-    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="/styles.css?v=50">
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Geist:wght@400;500;600;700&family=Hanken+Grotesk:wght@300;400;500;600;700;800&display=swap" rel="stylesheet">
 </head>
 <body>
 
+    <!-- ═══════════ FLOATING PARTICLES CANVAS ═══════════ -->
+    <div id="particles-container" class="particles-container"></div>
+
     <!-- ═══════════ LOGIN SCREEN ═══════════ -->
     <div id="login-screen" class="screen active">
-        <div class="login-container">
+        <!-- Interactive WebGL Aurora Canvas -->
+        <canvas id="shader-canvas-login" class="login-shader"></canvas>
+        <div class="login-overlay"></div>
+
+        <div class="login-wrapper">
+            <div class="orb orb-1"></div>
+            <div class="orb orb-2"></div>
+            <div class="orb orb-3"></div>
+
             <div class="login-card">
-                <div class="login-header">
-                    <div class="logo">
-                        <svg width="48" height="48" viewBox="0 0 24 24" fill="none" stroke="url(#grad)" stroke-width="1.5">
-                            <defs><linearGradient id="grad" x1="0%" y1="0%" x2="100%" y2="100%">
-                                <stop offset="0%" style="stop-color:#6C63FF"/>
-                                <stop offset="100%" style="stop-color:#3B82F6"/>
-                            </linearGradient></defs>
-                            <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/>
-                            <polyline points="17 8 12 3 7 8"/>
-                            <line x1="12" y1="3" x2="12" y2="15"/>
-                        </svg>
+                <div class="login-logo">
+                    <div class="logo-ring">
+                        <div class="logo-ring-inner"></div>
                     </div>
-                    <h1>Telegram Drive</h1>
-                    <p class="subtitle">Your personal cloud, powered by Telegram</p>
+                    <svg class="logo-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                        <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/>
+                        <polyline points="17 8 12 3 7 8"/>
+                        <line x1="12" y1="3" x2="12" y2="15"/>
+                    </svg>
                 </div>
 
-                <!-- Password Login -->
-                <div id="login-form">
-                    <label for="password-input">Password</label>
-                    <div class="input-group">
-                        <input type="password" id="password-input" placeholder="Enter password" autocomplete="current-password">
-                        <button id="login-btn" class="btn-primary" onclick="login()">
-                            <span class="btn-text">Login</span>
-                            <span class="btn-loader hidden"></span>
-                        </button>
+                <h1 class="login-title">Telegram Drive</h1>
+                <p class="login-subtitle">Obsidian Vault • Encrypted Cloud Storage</p>
+
+                <div class="login-divider">
+                    <span class="login-divider-dot"></span>
+                    <span class="login-divider-line"></span>
+                    <span class="login-divider-dot"></span>
+                </div>
+
+                <div id="login-form" class="login-form">
+                    <div class="input-float">
+                        <input type="password" id="password-input" placeholder=" " autocomplete="current-password" required>
+                        <label for="password-input">Master Password</label>
+                        <div class="input-glow"></div>
                     </div>
-                    <p class="hint">Enter the password set in your APP_PASSWORD config</p>
+                    <button id="login-btn" class="login-btn" onclick="login()">
+                        <span class="btn-text">Enter Vault</span>
+                        <span class="btn-loader hidden"></span>
+                        <svg class="btn-arrow" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M5 12h14"/><path d="m12 5 7 7-7 7"/></svg>
+                    </button>
                 </div>
 
                 <div id="login-error" class="error-msg hidden"></div>
+                <p class="login-footer-text">Protected by APP_PASSWORD</p>
             </div>
         </div>
     </div>
 
-    <!-- ═══════════ MAIN DRIVE SCREEN ═══════════ -->
-    <div id="drive-screen" class="screen">
-        <!-- Top Bar -->
-        <header class="topbar">
-            <div class="topbar-left">
-                <button class="hamburger" id="sidebar-toggle" onclick="toggleSidebar()">
-                    <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                        <line x1="3" y1="6" x2="21" y2="6"/><line x1="3" y1="12" x2="21" y2="12"/><line x1="3" y1="18" x2="21" y2="18"/>
-                    </svg>
+    <!-- ═══════════ MAIN OS-STYLE FILE MANAGER SCREEN ═══════════ -->
+    <div id="drive-screen" class="screen app-container">
+
+        <!-- ── Top Command Bar ── -->
+        <header class="command-bar">
+            <div class="command-bar-left">
+                <button class="hamburger-btn" id="sidebar-toggle" onclick="toggleSidebar()" title="Toggle Sidebar">
+                    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="3" y1="6" x2="21" y2="6"/><line x1="3" y1="12" x2="21" y2="12"/><line x1="3" y1="18" x2="21" y2="18"/></svg>
                 </button>
-                <h2 class="app-title">Telegram Drive</h2>
+                <div class="brand-pill" onclick="navigateToFolder(null, 'Root')">
+                    <div class="brand-dot"></div>
+                    <span class="brand-name">Telegram Drive</span>
+                </div>
+                <!-- Breadcrumbs -->
+                <nav class="breadcrumb-container" id="breadcrumb-bar"></nav>
             </div>
-            <div class="topbar-right">
-                <span id="user-info" class="user-badge"></span>
-                <button class="btn-ghost" onclick="logout()">Logout</button>
+
+            <!-- Central Search & Filters -->
+            <div class="command-bar-center">
+                <div class="search-box">
+                    <svg class="search-icon" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg>
+                    <input type="text" id="search-input" placeholder="Search files & documents..." oninput="handleSearch(this.value)">
+                    <button class="search-clear hidden" id="search-clear-btn" onclick="clearSearch()">✕</button>
+                </div>
+            </div>
+
+            <div class="command-bar-right">
+                <!-- View Mode Switcher: Grid vs List -->
+                <div class="view-switcher">
+                    <button class="view-btn active" id="view-grid-btn" onclick="setViewMode('grid')" title="Grid Cards View">
+                        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="3" width="7" height="7"/><rect x="14" y="3" width="7" height="7"/><rect x="14" y="14" width="7" height="7"/><rect x="3" y="14" width="7" height="7"/></svg>
+                    </button>
+                    <button class="view-btn" id="view-list-btn" onclick="setViewMode('list')" title="List Table View">
+                        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="8" y1="6" x2="21" y2="6"/><line x1="8" y1="12" x2="21" y2="12"/><line x1="8" y1="18" x2="21" y2="18"/><line x1="3" y1="6" x2="3.01" y2="6"/><line x1="3" y1="12" x2="3.01" y2="12"/><line x1="3" y1="18" x2="3.01" y2="18"/></svg>
+                    </button>
+                </div>
+
+                <!-- Inspector Sidebar Toggle -->
+                <button class="icon-toggle-btn" id="inspector-toggle-btn" onclick="toggleInspector()" title="Toggle File Details Inspector">
+                    <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="3" width="18" height="18" rx="2" ry="2"/><line x1="15" y1="3" x2="15" y2="21"/></svg>
+                </button>
+
+                <div class="user-pill">
+                    <span class="user-dot"></span>
+                    <span id="user-info">Admin</span>
+                </div>
+
+                <button class="logout-btn" onclick="logout()" title="Logout">
+                    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"/><polyline points="16 17 21 12 16 7"/><line x1="21" y1="12" x2="9" y2="12"/></svg>
+                </button>
             </div>
         </header>
 
-        <div class="drive-layout">
-            <!-- Sidebar -->
-            <aside class="sidebar" id="sidebar">
-                <div class="sidebar-section">
-                    <div class="sidebar-header">
-                        <h3>Folders</h3>
-                        <button class="btn-icon" onclick="showCreateFolderModal()" title="New folder">
-                            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                                <line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/>
-                            </svg>
+        <!-- ── Main Workspace Body (3-Pane Architecture) ── -->
+        <div class="workspace-layout">
+
+            <!-- ── Left Pane: Quick Access & Folder Hierarchy ── -->
+            <aside class="sidebar-pane" id="sidebar">
+                <!-- Quick Access -->
+                <div class="sidebar-group">
+                    <div class="sidebar-group-title">Quick Access</div>
+                    <div class="quick-nav-item" id="quick-root-item" onclick="navigateToFolder(null, 'Root')">
+                        <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 9l9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"/><polyline points="9 22 9 12 15 12 15 22"/></svg>
+                        <span>Root Vault</span>
+                        <span class="nav-badge" id="root-count-badge">0</span>
+                    </div>
+                </div>
+
+                <!-- Folders Tree -->
+                <div class="sidebar-group folder-tree-group">
+                    <div class="sidebar-group-header">
+                        <span class="sidebar-group-title">Folders</span>
+                        <button class="small-add-btn" onclick="showCreateFolderModal()" title="New Folder">
+                            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>
                         </button>
                     </div>
-                    <ul id="folder-list" class="folder-list">
-                        <!-- Folders rendered by JS -->
-                    </ul>
+                    <ul id="folder-list" class="folder-list"></ul>
                 </div>
-                <div class="sidebar-section sidebar-actions">
-                    <button class="btn-secondary btn-sm" id="rebuild-index-btn" onclick="rebuildIndex()" title="Rebuild index from Telegram">
-                        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                            <polyline points="23 4 23 10 17 10"/><path d="M20.49 15a9 9 0 1 1-2.12-9.36L23 10"/>
-                        </svg>
-                        Rebuild Index
-                    </button>
-                </div>
-                <div class="sidebar-footer">
-                    <div id="storage-info" class="storage-info">
-                        <div class="storage-bar"><div class="storage-fill" id="storage-fill"></div></div>
-                        <span class="storage-text" id="storage-text">∞ storage available</span>
+
+                <!-- Storage & Sync Status Card -->
+                <div class="sidebar-footer-card">
+                    <div class="storage-meta">
+                        <div class="storage-meta-label">Storage Capacity</div>
+                        <div class="storage-meta-val">∞ Infinite</div>
                     </div>
+                    <div class="storage-track"><div class="storage-fill" id="storage-fill"></div></div>
+                    <button class="rebuild-btn" id="rebuild-index-btn" onclick="rebuildIndex()">
+                        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="23 4 23 10 17 10"/><path d="M20.49 15a9 9 0 1 1-2.12-9.36L23 10"/></svg>
+                        <span>Sync with Telegram</span>
+                    </button>
                 </div>
             </aside>
 
-            <!-- Main Content -->
-            <main class="main-content">
-                <div class="content-header">
-                    <h2 id="current-folder-title">Root</h2>
-                    <div class="content-actions">
-                        <button class="btn-primary btn-upload" onclick="triggerUpload()">
-                            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                                <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/>
-                                <polyline points="17 8 12 3 7 8"/><line x1="12" y1="3" x2="12" y2="15"/>
-                            </svg>
-                            Upload
-                        </button>
+            <!-- ── Center Pane: Dynamic File Browser Canvas ── -->
+            <main class="browser-pane main-content" id="browser-main-pane">
+
+                <!-- Filter Bar & Context Status -->
+                <div class="browser-toolbar">
+                    <div class="folder-heading-wrap">
+                        <h2 id="current-folder-title" class="current-heading">Root</h2>
+                        <span class="item-count-badge" id="items-count-label">0 items</span>
+                    </div>
+
+                    <!-- Filter category chips -->
+                    <div class="category-filter-chips">
+                        <button class="chip active" onclick="setCategoryFilter('all')">All</button>
+                        <button class="chip" onclick="setCategoryFilter('images')">Images</button>
+                        <button class="chip" onclick="setCategoryFilter('video')">Videos</button>
+                        <button class="chip" onclick="setCategoryFilter('docs')">Documents</button>
+                        <button class="chip" onclick="setCategoryFilter('audio')">Audio</button>
+                        <button class="chip" onclick="setCategoryFilter('archives')">Archives</button>
                     </div>
                 </div>
 
-                <!-- Breadcrumb navigation -->
-                <nav class="breadcrumb-nav" id="breadcrumb-bar">
-                    <!-- Rendered by JS -->
-                </nav>
-
-                <!-- Upload drop zone -->
-                <div class="drop-zone" id="drop-zone">
-                    <input type="file" id="file-input" style="display:none" multiple>
-                    <p>Drop files here to upload</p>
-                </div>
-
-                <!-- Upload progress -->
+                <!-- Upload Progress Banner -->
                 <div id="upload-progress-container" class="upload-progress hidden">
                     <div class="progress-info">
                         <span id="upload-filename">Uploading...</span>
@@ -135,27 +191,98 @@
                     </div>
                 </div>
 
-                <!-- File list -->
-                <div id="files-container">
-                    <table class="file-table" id="files-table">
-                        <thead>
-                            <tr>
-                                <th class="col-name">Name</th>
-                                <th class="col-size">Size</th>
-                                <th class="col-actions">Actions</th>
-                            </tr>
-                        </thead>
-                        <tbody id="files-tbody"></tbody>
-                    </table>
+                <!-- Interactive Drop Zone -->
+                <div class="drop-zone" id="drop-zone" onclick="triggerUpload()">
+                    <input type="file" id="file-input" style="display:none" multiple>
+                    <div class="drop-zone-inner">
+                        <div class="drop-icon-box">
+                            <svg width="26" height="26" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="17 8 12 3 7 8"/><line x1="12" y1="3" x2="12" y2="15"/></svg>
+                        </div>
+                        <div class="drop-texts">
+                            <span class="drop-title">Drop files anywhere to upload to this folder</span>
+                            <span class="drop-sub">or click here • Zero quality loss • Up to 2GB per chunk</span>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Folders Grid (when subfolders exist) -->
+                <div class="subfolders-section hidden" id="subfolders-container">
+                    <div class="section-label">Sub-folders</div>
+                    <div class="folders-grid" id="subfolders-grid"></div>
+                </div>
+
+                <!-- File Items Grid / Table Viewport -->
+                <div class="files-viewport" id="files-viewport">
+                    
+                    <!-- 1. Grid Cards View -->
+                    <div class="files-card-grid" id="files-card-grid"></div>
+
+                    <!-- 2. List Table View -->
+                    <div class="files-list-table-wrap hidden" id="files-table-wrap">
+                        <table class="file-table" id="files-table">
+                            <thead>
+                                <tr>
+                                    <th class="col-name" onclick="sortFiles('name')">Name ↕</th>
+                                    <th class="col-type" onclick="sortFiles('type')">Type ↕</th>
+                                    <th class="col-size" onclick="sortFiles('size')">Size ↕</th>
+                                    <th class="col-actions">Actions</th>
+                                </tr>
+                            </thead>
+                            <tbody id="files-tbody"></tbody>
+                        </table>
+                    </div>
+
+                    <!-- Empty State -->
                     <div id="empty-state" class="empty-state hidden">
-                        <svg width="64" height="64" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1" opacity="0.3">
-                            <path d="M22 19a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h5l2 3h9a2 2 0 0 1 2 2z"/>
-                        </svg>
-                        <p>No files in this folder</p>
-                        <p class="hint">Drag & drop files or click Upload</p>
+                        <div class="empty-icon-shield">
+                            <svg width="40" height="40" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.3"><path d="M22 19a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h5l2 3h9a2 2 0 0 1 2 2z"/></svg>
+                        </div>
+                        <h3 class="empty-title">Folder is Empty</h3>
+                        <p class="empty-hint">Drop files anywhere or use the Upload button in the dock below</p>
+                        <button class="empty-action-btn" onclick="triggerUpload()">
+                            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>
+                            Upload Files
+                        </button>
                     </div>
                 </div>
             </main>
+
+            <!-- ── Right Pane: Details & Quick Preview Inspector ── -->
+            <aside class="inspector-pane" id="inspector-pane">
+                <div class="inspector-header">
+                    <span class="inspector-title">Inspector</span>
+                    <button class="inspector-close" onclick="closeInspector()" title="Close details">✕</button>
+                </div>
+
+                <!-- Content populated by JS when a file is selected -->
+                <div class="inspector-content" id="inspector-content">
+                    <div class="inspector-empty">
+                        <svg width="48" height="48" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1"><rect x="3" y="3" width="18" height="18" rx="2" ry="2"/><line x1="9" y1="3" x2="9" y2="21"/></svg>
+                        <p>Select any file to inspect metadata, stream details, and direct actions.</p>
+                    </div>
+                </div>
+            </aside>
+        </div>
+
+        <!-- ── Floating Bottom Action Dock ── -->
+        <div class="action-dock">
+            <button class="dock-btn primary" onclick="triggerUpload()" title="Upload files to current folder">
+                <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="17 8 12 3 7 8"/><line x1="12" y1="3" x2="12" y2="15"/></svg>
+                <span>Upload</span>
+            </button>
+            <div class="dock-divider"></div>
+            <button class="dock-btn" onclick="showCreateFolderModal()" title="Create new sub-folder">
+                <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>
+                <span>New Folder</span>
+            </button>
+            <button class="dock-btn" onclick="rebuildIndex()" title="Re-scan and sync with Telegram channel">
+                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="23 4 23 10 17 10"/><path d="M20.49 15a9 9 0 1 1-2.12-9.36L23 10"/></svg>
+                <span>Sync</span>
+            </button>
+            <div class="dock-divider"></div>
+            <button class="dock-btn icon-only" onclick="toggleInspector()" title="Toggle details panel">
+                <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="3" width="18" height="18" rx="2" ry="2"/><line x1="15" y1="3" x2="15" y2="21"/></svg>
+            </button>
         </div>
     </div>
 
@@ -172,12 +299,81 @@
         </div>
     </div>
 
-    <!-- ═══════════ CONTEXT MENU (Folder) ═══════════ -->
+    <!-- ═══════════ CONTEXT MENU ═══════════ -->
     <div id="context-menu" class="context-menu hidden">
         <button onclick="renameFolderAction()">Rename</button>
         <button class="danger" onclick="deleteFolderAction()">Delete</button>
     </div>
 
-    <script src="/app.js?v=12"></script>
+    <!-- ═══════════ SCRIPTS ═══════════ -->
+    <script>
+    // ── Mouse spotlight coordinates ──
+    document.addEventListener('mousemove', (e) => {
+        document.documentElement.style.setProperty('--mx', e.clientX + 'px');
+        document.documentElement.style.setProperty('--my', e.clientY + 'px');
+    });
+
+    // ── Floating ambient particles ──
+    (function initParticles() {
+        const container = document.getElementById('particles-container');
+        if (!container) return;
+        const count = 30;
+        for (let i = 0; i < count; i++) {
+            const p = document.createElement('div');
+            p.className = 'particle';
+            p.style.left = Math.random() * 100 + '%';
+            p.style.top = Math.random() * 100 + '%';
+            p.style.animationDelay = (Math.random() * 20) + 's';
+            p.style.animationDuration = (18 + Math.random() * 22) + 's';
+            const size = 2 + Math.random() * 3.5;
+            p.style.width = size + 'px';
+            p.style.height = size + 'px';
+            p.style.opacity = 0.12 + Math.random() * 0.28;
+            container.appendChild(p);
+        }
+    })();
+
+    // ── WebGL Aurora Shader (Login) ──
+    (function initShader() {
+        const canvas = document.getElementById('shader-canvas-login');
+        if (!canvas) return;
+        function sync() {
+            const w = window.innerWidth, h = window.innerHeight;
+            if (canvas.width !== w || canvas.height !== h) { canvas.width = w; canvas.height = h; }
+        }
+        window.addEventListener('resize', sync); sync();
+        const gl = canvas.getContext('webgl') || canvas.getContext('experimental-webgl');
+        if (!gl) return;
+        const vs = `attribute vec2 a;varying vec2 v;void main(){v=a*.5+.5;gl_Position=vec4(a,0,1);}`;
+        const fs = `precision highp float;varying vec2 v;uniform float t;uniform vec2 r,m;
+float h(vec2 p){return fract(sin(dot(p,vec2(127.1,311.7)))*43758.5453);}
+float n(vec2 p){vec2 i=floor(p),f=fract(p);f*=f*(3.-2.*f);return mix(mix(h(i),h(i+vec2(1,0)),f.x),mix(h(i+vec2(0,1)),h(i+vec2(1,1)),f.x),f.y);}
+void main(){
+  vec2 u=v;vec2 ms=m/r;
+  vec3 bg=vec3(.032,.036,.055);
+  float T=t*.3;
+  float w1=sin(u.x*4.+T)*sin(u.y*3.-T*.7)*.5+.5;
+  float w2=sin((u.x+u.y)*2.5+T*.8)*.5+.5;
+  float ns=n(u*3.+T*.12)*.5+.5;
+  vec3 em=vec3(.063,.725,.506);vec3 tl=vec3(.078,.722,.651);
+  float mask=smoothstep(.25,.75,w1*w2*ns);
+  vec3 aurora=mix(em,tl,sin(T*.4)*.5+.5)*mask*.25;
+  float d=distance(u,ms);
+  vec3 glow=mix(em,tl,.5)*smoothstep(.5,0.,d)*.5;
+  vec2 vg=u*2.-1.;float vig=1.-dot(vg,vg)*.45;
+  gl_FragColor=vec4(clamp((bg+aurora+glow)*vig,0.,1.),1.);
+}`;
+        function cs(type,src){const s=gl.createShader(type);gl.shaderSource(s,src);gl.compileShader(s);return s;}
+        const pg=gl.createProgram();gl.attachShader(pg,cs(gl.VERTEX_SHADER,vs));gl.attachShader(pg,cs(gl.FRAGMENT_SHADER,fs));gl.linkProgram(pg);gl.useProgram(pg);
+        const b=gl.createBuffer();gl.bindBuffer(gl.ARRAY_BUFFER,b);gl.bufferData(gl.ARRAY_BUFFER,new Float32Array([-1,-1,1,-1,-1,1,1,1]),gl.STATIC_DRAW);
+        const a=gl.getAttribLocation(pg,'a');gl.enableVertexAttribArray(a);gl.vertexAttribPointer(a,2,gl.FLOAT,false,0,0);
+        const ut=gl.getUniformLocation(pg,'t'),ur=gl.getUniformLocation(pg,'r'),um=gl.getUniformLocation(pg,'m');
+        let mx=innerWidth/2,my=innerHeight/2;
+        window.addEventListener('mousemove',e=>{mx=e.clientX;my=innerHeight-e.clientY;});
+        (function draw(T){sync();gl.viewport(0,0,canvas.width,canvas.height);gl.uniform1f(ut,T*.001);gl.uniform2f(ur,canvas.width,canvas.height);gl.uniform2f(um,mx,my);gl.drawArrays(gl.TRIANGLE_STRIP,0,4);requestAnimationFrame(draw);})(0);
+    })();
+    </script>
+
+    <script src="/app.js?v=50"></script>
 </body>
 </html>
