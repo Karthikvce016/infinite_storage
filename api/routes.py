@@ -12,7 +12,7 @@ from typing import Optional
 from uuid import uuid4
 
 from fastapi import APIRouter, UploadFile, File, Form, Request, HTTPException, BackgroundTasks
-from fastapi.responses import StreamingResponse
+from fastapi.responses import StreamingResponse, FileResponse
 
 from config.settings import TEMP_DIR
 from core.chunk_manager import compute_hash, split_file, merge_chunks, cleanup_chunks
@@ -179,7 +179,7 @@ async def download_file(
     record = db.get_file(file_id, folder_name, owner)
     if not record:
         log.warning("SYSTEM: Download failed — file not found: %s in folder %s", file_id, folder_name)
-        raise HTTPException(status_code=404, detail="File not found")
+        raise HTTPException(status_code=404, detail="File record not found in database")
 
     log.info("SYSTEM: Download — found record with %d chunks, msg_ids=%s", record.chunks, record.msg_ids)
 
@@ -191,27 +191,29 @@ async def download_file(
         )
         log.info("SYSTEM: Download — downloaded %d chunks to temp", len(chunk_paths))
 
-        # Merge chunks to temp
-        merged = TEMP_DIR / Path(file_id).name
+        # Merge chunks to unique temp file
+        safe_base = Path(file_id).name
+        unique_name = f"dl_{uuid4().hex}_{safe_base}"
+        merged = TEMP_DIR / unique_name
         merge_chunks(chunk_paths, merged)
         cleanup_chunks(chunk_paths)
         log.info("SYSTEM: Download — merged chunks to %s (%d bytes)", merged, merged.stat().st_size)
 
-        def file_iterator():
-            with open(merged, "rb") as f:
-                while chunk := f.read(8 * 1024 * 1024):
-                    yield chunk
-
         background_tasks.add_task(cleanup_file_task, merged)
 
-        safe_name = file_id.replace('"', '\\"')
-        log.info("SYSTEM: Download — streaming response for %s", safe_name)
-        return StreamingResponse(
-            file_iterator(),
+        return FileResponse(
+            path=merged,
             media_type="application/octet-stream",
-            headers={"Content-Disposition": f'attachment; filename="{safe_name}"'},
+            filename=safe_base,
+            content_disposition_type="attachment",
         )
 
+    except FileNotFoundError as fnf:
+        log.warning("Download failed — media chunk not in storage channel: %s", fnf)
+        raise HTTPException(
+            status_code=404,
+            detail="File message not found in Telegram channel. The file might have been uploaded to a previous channel or deleted."
+        )
     except HTTPException:
         raise
     except Exception as exc:
@@ -296,7 +298,7 @@ async def preview_file(
     record = db.get_file(file_id, folder_name, owner)
     if not record:
         log.warning("SYSTEM: Preview failed — file not found: %s in folder %s", file_id, folder_name)
-        raise HTTPException(status_code=404, detail="File not found")
+        raise HTTPException(status_code=404, detail="File record not found in database")
 
     if not _is_previewable(file_id):
         raise HTTPException(status_code=400, detail="File type not previewable")
@@ -311,32 +313,34 @@ async def preview_file(
         )
         log.info("SYSTEM: Preview — downloaded %d chunks to temp", len(chunk_paths))
 
-        # Merge chunks to temp
-        merged = TEMP_DIR / Path(file_id).name
+        # Merge chunks to unique temp file
+        safe_base = Path(file_id).name
+        unique_name = f"prev_{uuid4().hex}_{safe_base}"
+        merged = TEMP_DIR / unique_name
         merge_chunks(chunk_paths, merged)
         cleanup_chunks(chunk_paths)
         log.info("SYSTEM: Preview — merged chunks to %s (%d bytes)", merged, merged.stat().st_size)
 
-        def file_iterator():
-            with open(merged, "rb") as f:
-                while chunk := f.read(8 * 1024 * 1024):
-                    yield chunk
-
+        media_type = _get_media_type(file_id)
         background_tasks.add_task(cleanup_file_task, merged)
 
-        media_type = _get_media_type(file_id)
-        safe_name = file_id.replace('"', '\\"')
-        log.info("SYSTEM: Preview — streaming response for %s (type: %s)", safe_name, media_type)
-        return StreamingResponse(
-            file_iterator(),
+        return FileResponse(
+            path=merged,
             media_type=media_type,
+            filename=safe_base,
+            content_disposition_type="inline",
             headers={
-                "Content-Disposition": f'inline; filename="{safe_name}"',
                 "Cache-Control": "public, max-age=3600",
                 "Accept-Ranges": "bytes",
             },
         )
 
+    except FileNotFoundError as fnf:
+        log.warning("Preview failed — media chunk not in storage channel: %s", fnf)
+        raise HTTPException(
+            status_code=404,
+            detail="File message not found in Telegram channel. The file might have been uploaded to a previous channel or deleted."
+        )
     except HTTPException:
         raise
     except Exception as exc:

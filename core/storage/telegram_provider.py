@@ -34,6 +34,7 @@ from config.settings import (
     API_ID,
     API_HASH,
     BOT_TOKEN,
+    SESSION_STRING,
     STORAGE_CHANNEL_ID,
     FOLDER_PREFIX,
     DEFAULT_FOLDER_NAME,
@@ -78,43 +79,32 @@ class TelegramProvider(StorageProvider):
         We always create a TelegramClient first, then try the connection
         method that applies. If both are missing we raise.
         """
-        self.client = TelegramClient(
-            StringSession(), API_ID, API_HASH
-        )
-
-        # Resolve STORAGE_CHANNEL_ID early so the access hash is cached
-        # and can be used in all subsequent calls.
-        _channel_id = None
-        if STORAGE_CHANNEL_ID:
-            stripped = STORAGE_CHANNEL_ID.strip()
-            try:
-                if stripped.lstrip("-").isdigit():
-                    _channel_id = int(stripped)
-                    await self._resolve_channel(_channel_id)
-                else:
-                    entity = await self.client.get_entity(stripped)
-                    _channel_id = entity.id
-            except Exception as exc:
-                log.error(
-                    "SYSTEM: Failed to resolve STORAGE_CHANNEL_ID=%s — %s",
-                    STORAGE_CHANNEL_ID, exc,
-                )
-
         # Connection attempt.
-        if SESSION_STRING.strip():
+        if SESSION_STRING and SESSION_STRING.strip():
             log.info("SYSTEM: Connecting to Telegram with user session...")
             try:
-                session_obj = StringSession(SESSION_STRING)
-                await self.client.start(session_obj)
+                self.client = TelegramClient(
+                    StringSession(SESSION_STRING.strip()), API_ID, API_HASH
+                )
+                await self.client.start()
                 log.info("SYSTEM: User session loaded successfully")
             except Exception as sess_err:
                 log.warning(
                     "SYSTEM: User session failed (%s), falling back to BOT_TOKEN...",
                     sess_err,
                 )
-                await self.client.start(bot_token=BOT_TOKEN)
+                if BOT_TOKEN:
+                    self.client = TelegramClient(
+                        StringSession(), API_ID, API_HASH
+                    )
+                    await self.client.start(bot_token=BOT_TOKEN)
+                else:
+                    raise
         elif BOT_TOKEN:
             log.info("SYSTEM: Connecting to Telegram as a bot...")
+            self.client = TelegramClient(
+                StringSession(), API_ID, API_HASH
+            )
             await self.client.start(bot_token=BOT_TOKEN)
         else:
             raise RuntimeError(
@@ -133,25 +123,26 @@ class TelegramProvider(StorageProvider):
         # Verify connection
         me = await self.client.get_me()
         log.info(
-            "SYSTEM: Bot connected successfully — @%s (id=%s)",
-            me.username, me.id,
+            "SYSTEM: Connected successfully — @%s (id=%s)",
+            getattr(me, "username", None) or "unnamed",
+            getattr(me, "id", None),
         )
 
         # Store the storage channel ID as an integer.
         # Also resolve the entity to ensure the access hash is cached.
         if STORAGE_CHANNEL_ID:
             try:
-                # Ensure it's a valid integer. If it's a username (e.g. @channel), we try to resolve it.
-                if str(STORAGE_CHANNEL_ID).lstrip('-').isdigit():
-                    self._storage_channel_id = int(STORAGE_CHANNEL_ID)
+                stripped = str(STORAGE_CHANNEL_ID).strip()
+                if stripped.lstrip("-").isdigit():
+                    self._storage_channel_id = int(stripped)
                     # Explicitly resolve to cache the access hash
                     try:
                         entity = await self.client.get_entity(self._storage_channel_id)
-                        log.info("SYSTEM: Storage channel resolved — %s (id=%s)", entity.title, entity.id)
+                        log.info("SYSTEM: Storage channel resolved — %s (id=%s)", getattr(entity, "title", ""), entity.id)
                     except Exception as e:
                         log.warning("SYSTEM: Could not resolve storage channel entity: %s", e)
                 else:
-                    entity = await self.client.get_entity(STORAGE_CHANNEL_ID)
+                    entity = await self.client.get_entity(stripped)
                     self._storage_channel_id = entity.id
                     log.info("SYSTEM: Storage channel resolved to %s", self._storage_channel_id)
             except Exception as exc:

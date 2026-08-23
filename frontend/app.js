@@ -643,9 +643,16 @@ function openPreviewModal(fileId, previewUrl) {
             </div>
         `;
         contentHtml = `
+            <div class="preview-spinner-overlay" id="preview-loader">
+                <div class="preview-spinner"></div>
+                <p style="margin-top:14px;font-size:0.88rem;color:var(--text-secondary);">Retrieving file from Telegram...</p>
+            </div>
             <div class="preview-image-viewport" id="preview-image-viewport" style="width:100%;height:100%;display:flex;align-items:center;justify-content:center;margin:0 auto;overflow:hidden;position:relative;cursor:grab;user-select:none;touch-action:none;">
                 <div class="preview-image-wrapper" id="preview-image-wrapper" style="width:100%;height:100%;display:flex;align-items:center;justify-content:center;margin:0 auto;text-align:center;transform-origin:center center;">
-                    <img id="preview-target-img" src="${previewUrl}" alt="${escapeHtml(fileId)}" draggable="false" style="max-width:calc(88vw - 60px);max-height:calc(88vh - 110px);width:auto;height:auto;object-fit:contain;display:block;margin:auto;border-radius:6px;box-shadow:0 16px 50px rgba(0,0,0,0.75);">
+                    <img id="preview-target-img" src="${previewUrl}" alt="${escapeHtml(fileId)}" draggable="false"
+                        onload="document.getElementById('preview-loader')?.remove()"
+                        onerror="handlePreviewLoadError(this, '${escapeAttr(fileId)}')"
+                        style="max-width:calc(88vw - 60px);max-height:calc(88vh - 110px);width:auto;height:auto;object-fit:contain;display:block;margin:auto;border-radius:6px;box-shadow:0 16px 50px rgba(0,0,0,0.75);">
                 </div>
                 <div class="preview-hints">
                     <span><kbd>Wheel</kbd> Zoom</span>
@@ -658,8 +665,15 @@ function openPreviewModal(fileId, previewUrl) {
         `;
     } else if (['.mp4', '.webm', '.mov', '.mkv'].includes(ext)) {
         contentHtml = `
+            <div class="preview-spinner-overlay" id="preview-loader">
+                <div class="preview-spinner"></div>
+                <p style="margin-top:14px;font-size:0.88rem;color:var(--text-secondary);">Retrieving video from Telegram...</p>
+            </div>
             <div class="preview-media-container" style="width:100%;height:100%;display:flex;align-items:center;justify-content:center;padding:24px;">
-                <video controls autoplay playsinline style="max-width:100%;max-height:100%;">
+                <video controls autoplay playsinline
+                    onloadeddata="document.getElementById('preview-loader')?.remove()"
+                    onerror="handlePreviewLoadError(this, '${escapeAttr(fileId)}')"
+                    style="max-width:100%;max-height:100%;">
                     <source src="${previewUrl}" type="${getMediaType(ext)}">
                     Your browser does not support video playback.
                 </video>
@@ -667,8 +681,15 @@ function openPreviewModal(fileId, previewUrl) {
         `;
     } else if (['.mp3', '.wav', '.ogg', '.m4a', '.flac'].includes(ext)) {
         contentHtml = `
+            <div class="preview-spinner-overlay" id="preview-loader">
+                <div class="preview-spinner"></div>
+                <p style="margin-top:14px;font-size:0.88rem;color:var(--text-secondary);">Retrieving audio from Telegram...</p>
+            </div>
             <div class="preview-media-container" style="width:100%;height:100%;display:flex;align-items:center;justify-content:center;padding:24px;">
-                <audio controls autoplay style="width:100%;max-width:520px;">
+                <audio controls autoplay
+                    onloadeddata="document.getElementById('preview-loader')?.remove()"
+                    onerror="handlePreviewLoadError(this, '${escapeAttr(fileId)}')"
+                    style="width:100%;max-width:520px;">
                     <source src="${previewUrl}" type="${getMediaType(ext)}">
                     Your browser does not support audio playback.
                 </audio>
@@ -676,22 +697,54 @@ function openPreviewModal(fileId, previewUrl) {
         `;
     } else if (['.pdf'].includes(ext)) {
         contentHtml = `
-            <iframe class="preview-pdf-iframe" src="${previewUrl}" style="width:100%;height:100%;border:none;"></iframe>
+            <div class="preview-spinner-overlay" id="preview-loader">
+                <div class="preview-spinner"></div>
+                <p style="margin-top:14px;font-size:0.88rem;color:var(--text-secondary);">Retrieving PDF from Telegram...</p>
+            </div>
+            <iframe class="preview-pdf-iframe" src="${previewUrl}"
+                onload="document.getElementById('preview-loader')?.remove()"
+                onerror="handlePreviewLoadError(this, '${escapeAttr(fileId)}')"
+                style="width:100%;height:100%;border:none;"></iframe>
         `;
     } else if (['.txt', '.md', '.json', '.xml', '.html', '.css', '.js'].includes(ext)) {
         bodyClass = 'scrollable';
         contentHtml = `
-            <pre class="preview-code-container"><code id="preview-text-content">Loading...</code></pre>
+            <div class="preview-spinner-overlay" id="preview-loader">
+                <div class="preview-spinner"></div>
+                <p style="margin-top:14px;font-size:0.88rem;color:var(--text-secondary);">Retrieving file from Telegram...</p>
+            </div>
+            <pre class="preview-code-container"><code id="preview-text-content"></code></pre>
         `;
         fetch(previewUrl)
-            .then(r => r.text())
+            .then(async r => {
+                document.getElementById('preview-loader')?.remove();
+                if (!r.ok) {
+                    const err = await r.json().catch(() => ({ detail: `HTTP ${r.status}` }));
+                    throw new Error(err.detail || `HTTP ${r.status}`);
+                }
+                return r.text();
+            })
             .then(text => {
                 const el = document.getElementById('preview-text-content');
                 if (el) el.textContent = text;
             })
-            .catch(() => {
+            .catch((err) => {
+                document.getElementById('preview-loader')?.remove();
                 const el = document.getElementById('preview-text-content');
-                if (el) el.textContent = 'Failed to load preview';
+                if (el) {
+                    const parent = el.closest('.preview-dialog')?.querySelector('.modal-body');
+                    if (parent) {
+                        parent.innerHTML = `
+                            <div class="preview-error-box">
+                                <svg class="preview-error-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                                    <circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="12"/><line x1="12" y1="16" x2="12.01" y2="16"/>
+                                </svg>
+                                <h4 style="margin-bottom:8px;">Failed to Load Preview</h4>
+                                <p style="font-size:0.88rem;color:var(--text-secondary);margin-bottom:16px;">${escapeHtml(err.message)}</p>
+                            </div>
+                        `;
+                    }
+                }
             });
     }
 
@@ -983,6 +1036,32 @@ function closePreviewModal(modal) {
     }
     modal.style.opacity = '0';
     setTimeout(() => modal.remove(), 200);
+}
+
+function handlePreviewLoadError(el, fileId) {
+    document.getElementById('preview-loader')?.remove();
+    const modalBody = el ? (el.closest('.modal-body') || document.querySelector('.preview-dialog .modal-body')) : document.querySelector('.preview-dialog .modal-body');
+    if (modalBody) {
+        modalBody.innerHTML = `
+            <div class="preview-error-box">
+                <svg class="preview-error-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                    <circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="12"/><line x1="12" y1="16" x2="12.01" y2="16"/>
+                </svg>
+                <h4 style="margin-bottom:8px;font-size:1.1rem;font-weight:600;">Unable to Load Preview</h4>
+                <p style="font-size:0.88rem;color:var(--text-secondary);margin-bottom:20px;max-width:380px;line-height:1.5;">
+                    The file message could not be retrieved from Telegram. The file may have been uploaded to a previous channel or deleted.
+                </p>
+                <div style="display:flex;gap:10px;justify-content:center;">
+                    <button class="btn-primary btn-sm" onclick="downloadFile('${escapeAttr(fileId)}')">
+                        Try Downloading
+                    </button>
+                    <button class="btn-secondary btn-sm" onclick="closePreviewModal(this.closest('.modal-overlay'))">
+                        Close
+                    </button>
+                </div>
+            </div>
+        `;
+    }
 }
 
 function getMediaType(ext) {

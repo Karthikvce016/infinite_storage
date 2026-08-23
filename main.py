@@ -110,7 +110,7 @@ def main() -> None:
         )
         sys.exit(1)
 
-    if STORAGE_CHANNEL_ID:
+    if not STORAGE_CHANNEL_ID:
         print(
             "\n⚠  Storage channel missing.\n"
             "   1. Create a private channel in Telegram (this is where files are stored).\n"
