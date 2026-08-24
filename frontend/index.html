@@ -169,14 +169,40 @@
                         <span class="item-count-badge" id="items-count-label">0 items</span>
                     </div>
 
-                    <!-- Filter category chips -->
-                    <div class="category-filter-chips">
-                        <button class="chip active" onclick="setCategoryFilter('all')">All</button>
-                        <button class="chip" onclick="setCategoryFilter('images')">Images</button>
-                        <button class="chip" onclick="setCategoryFilter('video')">Videos</button>
-                        <button class="chip" onclick="setCategoryFilter('docs')">Documents</button>
-                        <button class="chip" onclick="setCategoryFilter('audio')">Audio</button>
-                        <button class="chip" onclick="setCategoryFilter('archives')">Archives</button>
+                    <div class="browser-toolbar-right">
+                        <!-- Filter category chips -->
+                        <div class="category-filter-chips">
+                            <button class="chip active" onclick="setCategoryFilter('all')">All</button>
+                            <button class="chip" onclick="setCategoryFilter('images')">Images</button>
+                            <button class="chip" onclick="setCategoryFilter('video')">Videos</button>
+                            <button class="chip" onclick="setCategoryFilter('docs')">Documents</button>
+                            <button class="chip" onclick="setCategoryFilter('audio')">Audio</button>
+                            <button class="chip" onclick="setCategoryFilter('archives')">Archives</button>
+                        </div>
+
+                        <!-- Google Photos Style Gallery Preview Dropdown -->
+                        <div class="gallery-trigger-wrap" id="gallery-trigger-wrap">
+                            <button class="gallery-btn" id="gallery-btn" onclick="startGalleryPreview(10, 0)" title="Start previewing starting from the first file">
+                                <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="3" width="18" height="18" rx="2"/><circle cx="8.5" cy="8.5" r="1.5"/><path d="M21 15l-5-5L5 21"/></svg>
+                                <span id="gallery-btn-label">Preview Top 10</span>
+                            </button>
+                            <button class="gallery-dropdown-toggle" id="gallery-dropdown-toggle" onclick="toggleGalleryMenu(event)" title="Choose number of files to preview">
+                                <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="6 9 12 15 18 9"/></svg>
+                            </button>
+                            <div class="gallery-menu hidden" id="gallery-menu">
+                                <div class="gallery-menu-header">Google Photos Preview</div>
+                                <button class="gallery-menu-item" onclick="startGalleryPreview(5, 0)">Top 5 Files</button>
+                                <button class="gallery-menu-item active" onclick="startGalleryPreview(10, 0)">Top 10 Files (Default)</button>
+                                <button class="gallery-menu-item" onclick="startGalleryPreview(25, 0)">Top 25 Files</button>
+                                <button class="gallery-menu-item" onclick="startGalleryPreview('all', 0)">All Files in Folder</button>
+                                <div class="gallery-menu-divider"></div>
+                                <div class="gallery-custom-input-wrap">
+                                    <span>Custom:</span>
+                                    <input type="number" id="custom-preview-count" min="1" max="500" value="10" placeholder="Count" onclick="event.stopPropagation()" onkeydown="if(event.key==='Enter') applyCustomGalleryPreview()">
+                                    <button onclick="applyCustomGalleryPreview(event)">Start</button>
+                                </div>
+                            </div>
+                        </div>
                     </div>
                 </div>
 
@@ -278,6 +304,10 @@
             <button class="dock-btn" onclick="rebuildIndex()" title="Re-scan and sync with Telegram channel">
                 <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="23 4 23 10 17 10"/><path d="M20.49 15a9 9 0 1 1-2.12-9.36L23 10"/></svg>
                 <span>Sync</span>
+            </button>
+            <button class="dock-btn" onclick="startGalleryPreview(10, 0)" title="Launch Google Photos style gallery preview">
+                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="3" width="18" height="18" rx="2"/><circle cx="8.5" cy="8.5" r="1.5"/><path d="M21 15l-5-5L5 21"/></svg>
+                <span>Gallery</span>
             </button>
             <div class="dock-divider"></div>
             <button class="dock-btn icon-only" onclick="toggleInspector()" title="Toggle details panel">

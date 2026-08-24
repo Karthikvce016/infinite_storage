@@ -893,6 +893,18 @@ async function deleteFile(fileId) {
 // ══════════════════════════════════════════════
 //  Preview Lightbox
 // ══════════════════════════════════════════════
+//  Google Photos Style Multi-File Gallery Previewer
+// ══════════════════════════════════════════════
+let galleryQueue = [];
+let galleryIndex = 0;
+let gallerySideBySide = false;
+let gallerySlideshowActive = false;
+let gallerySlideshowTimer = null;
+let gallerySlideshowProgressTimer = null;
+let gallerySlideshowDuration = 4000;
+let activeGalleryModal = null;
+let galleryZoomCleanup = null;
+
 function isPreviewable(fileId) {
     const ext = getFileExt(fileId);
     return [
@@ -903,8 +915,65 @@ function isPreviewable(fileId) {
         // Audio
         '.mp3', '.wav', '.ogg', '.m4a', '.flac',
         // Documents / Code
-        '.pdf', '.txt', '.md', '.json', '.xml', '.html', '.css', '.js',
+        '.pdf', '.txt', '.md', '.json', '.xml', '.html', '.css', '.js', '.py', '.cpp', '.sql', '.sh'
     ].includes(ext);
+}
+
+function toggleGalleryMenu(e) {
+    if (e) e.stopPropagation();
+    const menu = $("gallery-menu");
+    if (!menu) return;
+    menu.classList.toggle("hidden");
+}
+
+// Close gallery dropdown on outside click
+document.addEventListener("click", (e) => {
+    const wrap = $("gallery-trigger-wrap");
+    const menu = $("gallery-menu");
+    if (menu && !menu.classList.contains("hidden") && wrap && !wrap.contains(e.target)) {
+        menu.classList.add("hidden");
+    }
+});
+
+function applyCustomGalleryPreview(e) {
+    if (e) e.stopPropagation();
+    const input = $("custom-preview-count");
+    const val = parseInt(input ? input.value : "10", 10);
+    const count = isNaN(val) || val < 1 ? 10 : val;
+    $("gallery-menu")?.classList.add("hidden");
+    startGalleryPreview(count, 0);
+}
+
+function startGalleryPreview(limit = 10, startIndex = 0, customFiles = null) {
+    $("gallery-menu")?.classList.add("hidden");
+
+    // Update label on trigger button
+    const label = $("gallery-btn-label");
+    if (label) {
+        if (typeof limit === 'number') label.textContent = `Preview Top ${limit}`;
+        else if (limit === 'all') label.textContent = `Preview All`;
+    }
+
+    // Determine previewable file pool from currently visible / filtered files
+    let pool = customFiles || (allFiles && allFiles.length ? allFiles : []);
+    let previewableList = pool.filter(f => isPreviewable(f.id));
+
+    if (!previewableList.length) {
+        alert("No previewable media files (images, videos, audio, PDF, text) found in this folder.");
+        return;
+    }
+
+    if (limit === 'all') {
+        galleryQueue = [...previewableList];
+    } else {
+        const count = typeof limit === 'number' ? limit : 10;
+        galleryQueue = previewableList.slice(0, count);
+    }
+
+    galleryIndex = Math.max(0, Math.min(startIndex, galleryQueue.length - 1));
+    gallerySideBySide = false;
+    stopGallerySlideshow();
+    openGalleryModal();
 }
 
 function previewFile(fileId) {
@@ -912,207 +981,510 @@ function previewFile(fileId) {
         alert('This file type cannot be previewed directly. Please download it instead.');
         return;
     }
-    const previewUrl = `/api/folders/${currentFolderId}/preview/${encodeURIComponent(fileId)}`;
-    openPreviewModal(fileId, previewUrl);
+    const previewableList = (allFiles || []).filter(f => isPreviewable(f.id));
+    const idx = previewableList.findIndex(f => f.id === fileId);
+    if (idx !== -1) {
+        startGalleryPreview('all', idx);
+    } else {
+        const matched = (allFiles || []).find(f => f.id === fileId) || { id: fileId, name: fileId, size: 0 };
+        startGalleryPreview(1, 0, [matched]);
+    }
 }
 
-function openPreviewModal(fileId, previewUrl) {
+function openGalleryModal() {
+    if (activeGalleryModal) {
+        closeGalleryModal();
+    }
+
     const modal = document.createElement('div');
-    modal.className = 'modal-overlay preview-overlay';
-    modal.onclick = (e) => { if (e.target === modal) closePreviewModal(modal); };
+    modal.className = 'gallery-overlay';
+    modal.id = 'gallery-modal-overlay';
+    activeGalleryModal = modal;
 
-    const ext = getFileExt(fileId);
-    const isImage = ['.jpg', '.jpeg', '.png', '.gif', '.webp', '.bmp', '.ico', '.svg'].includes(ext);
-    let contentHtml = '';
-    let bodyClass = '';
-    let toolbarHtml = '';
+    modal.innerHTML = `
+        <!-- Top Control Header -->
+        <header class="gallery-header">
+            <div class="gallery-header-left">
+                <span class="gallery-counter-pill" id="gallery-counter">1 / 1</span>
+                <div class="gallery-title-box">
+                    <span class="gallery-active-title" id="gallery-title">Loading...</span>
+                    <span class="gallery-active-meta" id="gallery-meta"></span>
+                </div>
+            </div>
 
-    if (isImage) {
-        toolbarHtml = `
-            <div class="preview-toolbar">
-                <button class="preview-tool-btn" id="preview-zoom-out" title="Zoom Out (-)">
-                    <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/><line x1="8" y1="11" x2="14" y2="11"/></svg>
+            <!-- Center Image Tools & View Modes -->
+            <div class="gallery-header-center">
+                <!-- Zoom tools (images only) -->
+                <div id="gallery-zoom-tools" style="display:inline-flex;align-items:center;gap:4px;">
+                    <button class="gallery-tool-btn" id="gallery-zoom-out" title="Zoom Out (-)">
+                        <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/><line x1="8" y1="11" x2="14" y2="11"/></svg>
+                    </button>
+                    <span class="preview-zoom-label" id="gallery-zoom-label" title="Reset Zoom (100%)">100%</span>
+                    <button class="gallery-tool-btn" id="gallery-zoom-in" title="Zoom In (+)">
+                        <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/><line x1="11" y1="8" x2="11" y2="14"/><line x1="8" y1="11" x2="14" y2="11"/></svg>
+                    </button>
+                    <button class="gallery-tool-btn" id="gallery-zoom-fit" title="Toggle 2.5x (F)">
+                        <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M8 3H5a2 2 0 0 0-2 2v3m18 0V5a2 2 0 0 0-2-2h-3m0 18h3a2 2 0 0 0 2-2v-3M3 16v3a2 2 0 0 0 2 2h3"/></svg>
+                    </button>
+                    <button class="gallery-tool-btn" id="gallery-rotate" title="Rotate 90° (R)">
+                        <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21.5 2v6h-6M21.34 15.57a10 10 0 1 1-.57-8.38l5.67-5.67"/></svg>
+                    </button>
+                    <div class="preview-divider"></div>
+                </div>
+
+                <!-- Side-by-Side Comparison Toggle -->
+                <button class="gallery-tool-btn" id="gallery-side-btn" onclick="toggleGallerySideBySide()" title="Compare 2 files side-by-side (S)">
+                    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="3" width="18" height="18" rx="2"/><line x1="12" y1="3" x2="12" y2="21"/></svg>
                 </button>
-                <span class="preview-zoom-label" id="preview-zoom-label" title="Reset (100%)">100%</span>
-                <button class="preview-tool-btn" id="preview-zoom-in" title="Zoom In (+)">
-                    <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/><line x1="11" y1="8" x2="11" y2="14"/><line x1="8" y1="11" x2="14" y2="11"/></svg>
+
+                <!-- Slideshow Play / Pause -->
+                <button class="gallery-tool-btn" id="gallery-slideshow-btn" onclick="toggleGallerySlideshow()" title="Play / Pause Slideshow (Space)">
+                    <svg id="gallery-play-icon" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polygon points="5 3 19 12 5 21 5 3"/></svg>
+                    <svg id="gallery-pause-icon" class="hidden" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="6" y="4" width="4" height="16"/><rect x="14" y="4" width="4" height="16"/></svg>
                 </button>
-                <div class="preview-divider"></div>
-                <button class="preview-tool-btn" id="preview-zoom-fit" title="Toggle 2.5x (F)">
-                    <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M8 3H5a2 2 0 0 0-2 2v3m18 0V5a2 2 0 0 0-2-2h-3m0 18h3a2 2 0 0 0 2-2v-3M3 16v3a2 2 0 0 0 2 2h3"/></svg>
-                </button>
-                <button class="preview-tool-btn" id="preview-rotate" title="Rotate 90° (R)">
-                    <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21.5 2v6h-6M21.34 15.57a10 10 0 1 1-.57-8.38l5.67-5.67"/></svg>
-                </button>
-                <button class="preview-tool-btn" id="preview-reset" title="Reset View (0)">
-                    <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 12a9 9 0 1 0 9-9 9.75 9.75 0 0 0-6.74 2.74L3 8"/><path d="M3 3v5h5"/></svg>
+
+                <!-- Fullscreen Toggle -->
+                <button class="gallery-tool-btn" onclick="toggleGalleryFullscreen()" title="Toggle Fullscreen (F)">
+                    <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="15 3 21 3 21 9"/><polyline points="9 21 3 21 3 15"/><line x1="21" y1="3" x2="14" y2="10"/><line x1="3" y1="21" x2="10" y2="14"/></svg>
                 </button>
             </div>
-        `;
-        contentHtml = `
-            <div class="preview-spinner-overlay" id="preview-loader">
+
+            <!-- Right Actions -->
+            <div class="gallery-header-right">
+                <button class="btn-action download" id="gallery-download-btn" onclick="downloadCurrentGalleryFile()">Download</button>
+                <button class="btn-icon" onclick="closeGalleryModal()" title="Close (Esc)">✕</button>
+            </div>
+        </header>
+
+        <!-- Slideshow Progress Bar -->
+        <div class="gallery-slideshow-progress-bar" id="gallery-progress-bar"></div>
+
+        <!-- Main Display Stage -->
+        <main class="gallery-stage" id="gallery-stage">
+            <!-- Left Navigation Chevron -->
+            <button class="gallery-nav-btn prev" id="gallery-prev-btn" onclick="galleryNav(-1)" title="Previous File (←)">
+                <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><polyline points="15 18 9 12 15 6"/></svg>
+            </button>
+
+            <!-- Media Viewport Container -->
+            <div class="gallery-viewport" id="gallery-viewport">
+                <!-- Media injected dynamically here -->
+            </div>
+
+            <!-- Right Navigation Chevron -->
+            <button class="gallery-nav-btn next" id="gallery-next-btn" onclick="galleryNav(1)" title="Next File (→)">
+                <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><polyline points="9 18 15 12 9 6"/></svg>
+            </button>
+
+            <!-- Navigation Hints Pill -->
+            <div class="gallery-hints-pill">
+                <span><kbd>←</kbd> <kbd>→</kbd> Navigate</span>
+                <span><kbd>Space</kbd> Slideshow</span>
+                <span><kbd>S</kbd> Side-by-Side</span>
+                <span><kbd>Esc</kbd> Exit</span>
+            </div>
+        </main>
+
+        <!-- Bottom Google Photos Filmstrip Ribbon -->
+        <footer class="gallery-filmstrip-bar">
+            <div class="gallery-filmstrip-track" id="gallery-filmstrip-track">
+                <!-- Thumbnails injected dynamically here -->
+            </div>
+        </footer>
+    `;
+
+    document.body.appendChild(modal);
+
+    // Keyboard navigation listener
+    const onKeyDown = (e) => {
+        if (e.key === 'Escape') {
+            closeGalleryModal();
+        } else if (e.key === 'ArrowLeft' || e.key === 'PageUp') {
+            galleryNav(-1);
+        } else if (e.key === 'ArrowRight' || e.key === 'PageDown') {
+            galleryNav(1);
+        } else if (e.key === ' ' || e.code === 'Space') {
+            e.preventDefault();
+            toggleGallerySlideshow();
+        } else if (e.key === 's' || e.key === 'S') {
+            toggleGallerySideBySide();
+        } else if (e.key === 'f' || e.key === 'F') {
+            toggleGalleryFullscreen();
+        }
+    };
+    window.addEventListener('keydown', onKeyDown);
+    modal._keyCleanup = () => window.removeEventListener('keydown', onKeyDown);
+
+    renderGalleryContent();
+}
+
+function renderGalleryContent() {
+    if (!activeGalleryModal || !galleryQueue.length) return;
+
+    const currentFile = galleryQueue[galleryIndex];
+    const total = galleryQueue.length;
+
+    // 1. Update Counter & Meta Header
+    const counterEl = activeGalleryModal.querySelector('#gallery-counter');
+    if (counterEl) counterEl.textContent = `${galleryIndex + 1} / ${total}`;
+
+    const titleEl = activeGalleryModal.querySelector('#gallery-title');
+    if (titleEl) {
+        titleEl.textContent = currentFile.id;
+        titleEl.title = currentFile.id;
+    }
+
+    const metaEl = activeGalleryModal.querySelector('#gallery-meta');
+    if (metaEl) {
+        const ext = getFileExt(currentFile.id).toUpperCase().replace('.', '') || 'FILE';
+        metaEl.textContent = `${ext} • ${formatBytes(currentFile.size || 0)}`;
+    }
+
+    // 2. Update Nav Buttons Disabled State
+    const prevBtn = activeGalleryModal.querySelector('#gallery-prev-btn');
+    const nextBtn = activeGalleryModal.querySelector('#gallery-next-btn');
+    if (prevBtn) prevBtn.disabled = (galleryIndex === 0 && !gallerySlideshowActive);
+    if (nextBtn) nextBtn.disabled = (galleryIndex === total - 1 && !gallerySlideshowActive);
+
+    // 3. Update Side-by-side Button Active State
+    const sideBtn = activeGalleryModal.querySelector('#gallery-side-btn');
+    if (sideBtn) sideBtn.classList.toggle('active', gallerySideBySide);
+
+    // 4. Render Stage Media
+    const viewport = activeGalleryModal.querySelector('#gallery-viewport');
+    if (viewport) {
+        if (gallerySideBySide && total > 1) {
+            renderGallerySideBySide(viewport);
+        } else {
+            renderGallerySingle(viewport, currentFile);
+        }
+    }
+
+    // 5. Render & Highlight Filmstrip
+    renderGalleryFilmstrip();
+}
+
+function renderGallerySingle(viewport, file) {
+    if (galleryZoomCleanup) {
+        galleryZoomCleanup();
+        galleryZoomCleanup = null;
+    }
+
+    const ext = getFileExt(file.id);
+    const isImage = ['.jpg', '.jpeg', '.png', '.gif', '.webp', '.bmp', '.ico', '.svg'].includes(ext);
+    const previewUrl = `/api/folders/${currentFolderId}/preview/${encodeURIComponent(file.id)}`;
+
+    // Show/hide image zoom toolbar
+    const zoomTools = activeGalleryModal.querySelector('#gallery-zoom-tools');
+    if (zoomTools) zoomTools.style.display = isImage ? 'inline-flex' : 'none';
+
+    if (isImage) {
+        viewport.innerHTML = `
+            <div class="preview-spinner-overlay" id="gallery-loader">
                 <div class="preview-spinner"></div>
                 <p style="margin-top:14px;font-size:0.85rem;color:var(--text-2);">Retrieving image from Telegram...</p>
             </div>
-            <div class="preview-image-viewport" id="preview-image-viewport">
-                <div class="preview-image-wrapper" id="preview-image-wrapper">
-                    <img src="${previewUrl}" alt="${escapeAttr(fileId)}"
-                        onload="document.getElementById('preview-loader')?.remove()"
-                        onerror="handlePreviewLoadError(this, '${escapeAttr(fileId)}')">
+            <div class="gallery-image-viewport" id="gallery-image-viewport">
+                <div class="gallery-image-wrapper" id="gallery-image-wrapper">
+                    <img src="${previewUrl}" alt="${escapeAttr(file.id)}"
+                        onload="document.getElementById('gallery-loader')?.remove()"
+                        onerror="handlePreviewLoadError(this, '${escapeAttr(file.id)}')">
                 </div>
             </div>
-            <div class="preview-hints">
-                <span><kbd>Scroll</kbd> Zoom</span>
-                <span><kbd>Drag</kbd> Pan</span>
-                <span><kbd>Double-click</kbd> Fit/2.5x</span>
-                <span><kbd>Esc</kbd> Close</span>
-            </div>
         `;
+
+        const imgViewport = viewport.querySelector('#gallery-image-viewport');
+        const imgWrapper = viewport.querySelector('#gallery-image-wrapper');
+        const label = activeGalleryModal.querySelector('#gallery-zoom-label');
+        const btnIn = activeGalleryModal.querySelector('#gallery-zoom-in');
+        const btnOut = activeGalleryModal.querySelector('#gallery-zoom-out');
+        const btnFit = activeGalleryModal.querySelector('#gallery-zoom-fit');
+        const btnRotate = activeGalleryModal.querySelector('#gallery-rotate');
+
+        galleryZoomCleanup = setupImageZoomPan({
+            modal: activeGalleryModal,
+            viewport: imgViewport,
+            wrapper: imgWrapper,
+            label: label,
+            btnIn: btnIn,
+            btnOut: btnOut,
+            btnFit: btnFit,
+            btnReset: label,
+            btnRotate: btnRotate
+        });
+
     } else if (['.mp4', '.webm', '.mov', '.mkv'].includes(ext)) {
-        contentHtml = `
-            <div class="preview-spinner-overlay" id="preview-loader">
+        viewport.innerHTML = `
+            <div class="preview-spinner-overlay" id="gallery-loader">
                 <div class="preview-spinner"></div>
                 <p style="margin-top:14px;font-size:0.85rem;color:var(--text-2);">Streaming video from Telegram...</p>
             </div>
             <div class="preview-media-container">
-                <video controls autoplay playsinline
-                    onloadeddata="document.getElementById('preview-loader')?.remove()"
-                    onerror="handlePreviewLoadError(this, '${escapeAttr(fileId)}')">
+                <video controls autoplay playsinline style="max-width:100%;max-height:100%;border-radius:12px;box-shadow:0 24px 70px rgba(0,0,0,0.85);"
+                    onloadeddata="document.getElementById('gallery-loader')?.remove()"
+                    onerror="handlePreviewLoadError(this, '${escapeAttr(file.id)}')">
                     <source src="${previewUrl}">
                 </video>
             </div>
         `;
     } else if (['.mp3', '.wav', '.ogg', '.m4a', '.flac'].includes(ext)) {
-        contentHtml = `
-            <div class="preview-spinner-overlay" id="preview-loader">
+        viewport.innerHTML = `
+            <div class="preview-spinner-overlay" id="gallery-loader">
                 <div class="preview-spinner"></div>
                 <p style="margin-top:14px;font-size:0.85rem;color:var(--text-2);">Streaming audio from Telegram...</p>
             </div>
-            <div class="preview-media-container">
-                <audio controls autoplay
-                    oncanplay="document.getElementById('preview-loader')?.remove()"
-                    onerror="handlePreviewLoadError(this, '${escapeAttr(fileId)}')">
+            <div class="preview-media-container" style="flex-direction:column;gap:20px;">
+                <div style="font-size:3rem;">🎵</div>
+                <h3 style="font-size:1.1rem;color:var(--text-1);">${escapeHtml(file.id)}</h3>
+                <audio controls autoplay style="width:100%;max-width:540px;"
+                    oncanplay="document.getElementById('gallery-loader')?.remove()"
+                    onerror="handlePreviewLoadError(this, '${escapeAttr(file.id)}')">
                     <source src="${previewUrl}">
                 </audio>
             </div>
         `;
     } else if (ext === '.pdf') {
-        contentHtml = `
-            <div class="preview-spinner-overlay" id="preview-loader">
+        viewport.innerHTML = `
+            <div class="preview-spinner-overlay" id="gallery-loader">
                 <div class="preview-spinner"></div>
                 <p style="margin-top:14px;font-size:0.85rem;color:var(--text-2);">Retrieving PDF from Telegram...</p>
             </div>
-            <iframe class="preview-pdf-iframe" src="${previewUrl}"
-                onload="document.getElementById('preview-loader')?.remove()"
-                onerror="handlePreviewLoadError(this, '${escapeAttr(fileId)}')"></iframe>
+            <iframe class="preview-pdf-iframe" src="${previewUrl}" style="width:100%;height:100%;border-radius:12px;border:none;"
+                onload="document.getElementById('gallery-loader')?.remove()"
+                onerror="handlePreviewLoadError(this, '${escapeAttr(file.id)}')"></iframe>
         `;
     } else {
-        bodyClass = 'scrollable';
-        contentHtml = `
-            <div class="preview-spinner-overlay" id="preview-loader">
+        viewport.innerHTML = `
+            <div class="preview-spinner-overlay" id="gallery-loader">
                 <div class="preview-spinner"></div>
-                <p style="margin-top:14px;font-size:0.85rem;color:var(--text-2);">Retrieving file from Telegram...</p>
+                <p style="margin-top:14px;font-size:0.85rem;color:var(--text-2);">Retrieving code/text from Telegram...</p>
             </div>
-            <pre class="preview-code-container"><code id="preview-text-content"></code></pre>
+            <pre class="preview-code-container" style="width:100%;height:100%;max-height:80vh;"><code id="gallery-text-content"></code></pre>
         `;
         fetch(previewUrl)
             .then(async r => {
-                document.getElementById('preview-loader')?.remove();
-                if (!r.ok) {
-                    const err = await r.json().catch(() => ({ detail: `HTTP ${r.status}` }));
-                    throw new Error(err.detail || `HTTP ${r.status}`);
-                }
+                document.getElementById('gallery-loader')?.remove();
+                if (!r.ok) throw new Error(`HTTP ${r.status}`);
                 return r.text();
             })
-            .then(text => {
-                const el = document.getElementById('preview-text-content');
-                if (el) el.textContent = text;
+            .then(txt => {
+                const el = document.getElementById('gallery-text-content');
+                if (el) el.textContent = txt;
             })
-            .catch((err) => {
-                document.getElementById('preview-loader')?.remove();
-                const el = document.getElementById('preview-text-content');
-                if (el) {
-                    const parent = el.closest('.preview-dialog')?.querySelector('.modal-body');
-                    if (parent) {
-                        parent.innerHTML = `
-                            <div class="preview-error-box">
-                                <svg class="preview-error-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                                    <circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="12"/><line x1="12" y1="16" x2="12.01" y2="16"/>
-                                </svg>
-                                <h4 style="margin-bottom:8px;">Failed to Load Preview</h4>
-                                <p style="font-size:0.85rem;color:var(--text-2);">${escapeHtml(err.message)}</p>
-                            </div>
-                        `;
-                    }
-                }
+            .catch(err => {
+                document.getElementById('gallery-loader')?.remove();
+                viewport.innerHTML = `
+                    <div class="preview-error-box">
+                        <svg class="preview-error-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                            <circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="12"/><line x1="12" y1="16" x2="12.01" y2="16"/>
+                        </svg>
+                        <h4 style="margin-bottom:8px;">Failed to Load Preview</h4>
+                        <p style="font-size:0.85rem;color:var(--text-2);">${escapeHtml(err.message)}</p>
+                    </div>
+                `;
             });
     }
+}
 
-    modal.innerHTML = `
-        <div class="preview-dialog" onclick="event.stopPropagation()">
-            <div class="modal-header">
-                <div class="preview-header-left">
-                    <span class="preview-badge">${escapeHtml(ext.replace('.', '') || 'FILE')}</span>
-                    <h3 class="preview-title" title="${escapeAttr(fileId)}">${escapeHtml(fileId)}</h3>
+function renderGallerySideBySide(viewport) {
+    if (galleryZoomCleanup) {
+        galleryZoomCleanup();
+        galleryZoomCleanup = null;
+    }
+
+    const fileA = galleryQueue[galleryIndex];
+    const nextIdx = (galleryIndex + 1) % galleryQueue.length;
+    const fileB = galleryQueue[nextIdx];
+
+    const urlA = `/api/folders/${currentFolderId}/preview/${encodeURIComponent(fileA.id)}`;
+    const urlB = `/api/folders/${currentFolderId}/preview/${encodeURIComponent(fileB.id)}`;
+
+    viewport.innerHTML = `
+        <div class="gallery-split-view">
+            <!-- Left Pane -->
+            <div class="gallery-split-pane">
+                <div class="gallery-split-pane-header">
+                    <span><strong>#${galleryIndex + 1}</strong> ${escapeHtml(fileA.id)}</span>
+                    <span>${formatBytes(fileA.size || 0)}</span>
                 </div>
-                ${toolbarHtml}
-                <div class="preview-header-actions">
-                    <button class="btn-action download" onclick="downloadFile('${escapeAttr(fileId)}')">Download</button>
-                    <button class="btn-icon" onclick="closePreviewModal(this.closest('.modal-overlay'))" title="Close (Esc)">✕</button>
+                <div class="gallery-split-pane-body">
+                    <img src="${urlA}" alt="${escapeAttr(fileA.id)}" onerror="this.style.display='none'">
                 </div>
             </div>
-            <div class="modal-body ${bodyClass}">
-                ${contentHtml}
+
+            <!-- Right Pane -->
+            <div class="gallery-split-pane">
+                <div class="gallery-split-pane-header">
+                    <span><strong>#${nextIdx + 1}</strong> ${escapeHtml(fileB.id)}</span>
+                    <span>${formatBytes(fileB.size || 0)}</span>
+                </div>
+                <div class="gallery-split-pane-body">
+                    <img src="${urlB}" alt="${escapeAttr(fileB.id)}" onerror="this.style.display='none'">
+                </div>
             </div>
         </div>
     `;
 
-    document.body.appendChild(modal);
+    // Hide image zoom controls during side-by-side mode
+    const zoomTools = activeGalleryModal.querySelector('#gallery-zoom-tools');
+    if (zoomTools) zoomTools.style.display = 'none';
+}
 
-    if (isImage) {
-        const viewport = modal.querySelector('#preview-image-viewport');
-        const wrapper = modal.querySelector('#preview-image-wrapper');
-        const label = modal.querySelector('#preview-zoom-label');
-        const btnIn = modal.querySelector('#preview-zoom-in');
-        const btnOut = modal.querySelector('#preview-zoom-out');
-        const btnFit = modal.querySelector('#preview-zoom-fit');
-        const btnReset = modal.querySelector('#preview-reset');
-        const btnRotate = modal.querySelector('#preview-rotate');
+function renderGalleryFilmstrip() {
+    const track = activeGalleryModal?.querySelector('#gallery-filmstrip-track');
+    if (!track) return;
 
-        modal._cleanup = setupImageZoomPan({
-            modal, viewport, wrapper, label, btnIn, btnOut, btnFit, btnReset, btnRotate,
-        });
-    } else {
-        const onKeyDown = (e) => {
-            if (e.key === 'Escape') closePreviewModal(modal);
-        };
-        window.addEventListener('keydown', onKeyDown);
-        modal._cleanup = () => window.removeEventListener('keydown', onKeyDown);
+    track.innerHTML = galleryQueue.map((file, i) => {
+        const ext = getFileExt(file.id);
+        const isImg = ['.jpg', '.jpeg', '.png', '.gif', '.webp', '.bmp', '.svg', '.ico'].includes(ext);
+        const previewUrl = `/api/folders/${currentFolderId}/preview/${encodeURIComponent(file.id)}`;
+        const isActive = i === galleryIndex ? 'active' : '';
+
+        return `
+            <div class="gallery-thumb-card ${isActive}" id="filmstrip-thumb-${i}" onclick="jumpToGalleryIndex(${i})" title="${escapeAttr(file.id)} (${formatBytes(file.size || 0)})">
+                ${isImg 
+                    ? `<img class="gallery-thumb-img" src="${previewUrl}" loading="lazy" alt="${escapeAttr(file.id)}" onerror="this.parentElement.innerHTML='<div class=\\'gallery-thumb-icon\\'>${escapeAttr(ext)}</div>'">` 
+                    : `<div class="gallery-thumb-icon">
+                        ${getFileIconSvg(ext)}
+                        <span>${escapeHtml(ext.replace('.', ''))}</span>
+                       </div>`
+                }
+                <span class="gallery-thumb-badge">${i + 1}</span>
+            </div>
+        `;
+    }).join('');
+
+    // Smoothly scroll active thumbnail into center view
+    setTimeout(() => {
+        const activeCard = track.querySelector(`#filmstrip-thumb-${galleryIndex}`);
+        if (activeCard) {
+            activeCard.scrollIntoView({ behavior: 'smooth', block: 'nearest', inline: 'center' });
+        }
+    }, 50);
+}
+
+function jumpToGalleryIndex(i) {
+    if (i >= 0 && i < galleryQueue.length) {
+        galleryIndex = i;
+        resetSlideshowProgress();
+        renderGalleryContent();
     }
 }
 
-function handlePreviewLoadError(el, fileId) {
-    const parent = el.closest('.preview-dialog')?.querySelector('.modal-body');
-    if (!parent) return;
-    parent.innerHTML = `
-        <div class="preview-error-box">
-            <svg class="preview-error-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                <circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="12"/><line x1="12" y1="16" x2="12.01" y2="16"/>
-            </svg>
-            <h4 style="margin-bottom:8px;font-size:1.05rem;">File Not Found on Telegram</h4>
-            <p style="font-size:0.84rem;color:var(--text-2);margin-bottom:18px;">
-                The message containing <strong>${escapeHtml(fileId)}</strong> could not be retrieved. Click Sync below to re-index your channel.
-            </p>
-            <button class="btn-primary" onclick="rebuildIndex();closePreviewModal(this.closest('.modal-overlay'))">
-                Sync Telegram Index
-            </button>
-        </div>
-    `;
+function galleryNav(delta) {
+    const newIdx = galleryIndex + delta;
+    if (newIdx >= 0 && newIdx < galleryQueue.length) {
+        galleryIndex = newIdx;
+        resetSlideshowProgress();
+        renderGalleryContent();
+    } else if (gallerySlideshowActive) {
+        // Loop slideshow
+        galleryIndex = delta > 0 ? 0 : galleryQueue.length - 1;
+        resetSlideshowProgress();
+        renderGalleryContent();
+    }
 }
 
-function closePreviewModal(modal) {
-    if (modal._cleanup) modal._cleanup();
-    modal.remove();
+function toggleGallerySideBySide() {
+    gallerySideBySide = !gallerySideBySide;
+    renderGalleryContent();
+}
+
+function toggleGallerySlideshow() {
+    if (gallerySlideshowActive) {
+        stopGallerySlideshow();
+    } else {
+        startGallerySlideshow();
+    }
+}
+
+function startGallerySlideshow() {
+    gallerySlideshowActive = true;
+    const playIcon = activeGalleryModal?.querySelector('#gallery-play-icon');
+    const pauseIcon = activeGalleryModal?.querySelector('#gallery-pause-icon');
+    const slideshowBtn = activeGalleryModal?.querySelector('#gallery-slideshow-btn');
+
+    if (playIcon) playIcon.classList.add('hidden');
+    if (pauseIcon) pauseIcon.classList.remove('hidden');
+    if (slideshowBtn) slideshowBtn.classList.add('active');
+
+    resetSlideshowProgress();
+    runSlideshowTick();
+}
+
+function stopGallerySlideshow() {
+    gallerySlideshowActive = false;
+    if (gallerySlideshowTimer) {
+        clearTimeout(gallerySlideshowTimer);
+        gallerySlideshowTimer = null;
+    }
+    if (gallerySlideshowProgressTimer) {
+        clearInterval(gallerySlideshowProgressTimer);
+        gallerySlideshowProgressTimer = null;
+    }
+
+    const playIcon = activeGalleryModal?.querySelector('#gallery-play-icon');
+    const pauseIcon = activeGalleryModal?.querySelector('#gallery-pause-icon');
+    const slideshowBtn = activeGalleryModal?.querySelector('#gallery-slideshow-btn');
+    const pbar = activeGalleryModal?.querySelector('#gallery-progress-bar');
+
+    if (playIcon) playIcon.classList.remove('hidden');
+    if (pauseIcon) pauseIcon.classList.add('hidden');
+    if (slideshowBtn) slideshowBtn.classList.remove('active');
+    if (pbar) pbar.style.width = '0%';
+}
+
+function resetSlideshowProgress() {
+    if (!gallerySlideshowActive) return;
+    if (gallerySlideshowTimer) clearTimeout(gallerySlideshowTimer);
+    if (gallerySlideshowProgressTimer) clearInterval(gallerySlideshowProgressTimer);
+
+    const pbar = activeGalleryModal?.querySelector('#gallery-progress-bar');
+    if (pbar) pbar.style.width = '0%';
+
+    const startTime = Date.now();
+    gallerySlideshowProgressTimer = setInterval(() => {
+        const elapsed = Date.now() - startTime;
+        const pct = Math.min(100, (elapsed / gallerySlideshowDuration) * 100);
+        if (pbar) pbar.style.width = `${pct}%`;
+    }, 50);
+
+    gallerySlideshowTimer = setTimeout(() => {
+        galleryNav(1);
+    }, gallerySlideshowDuration);
+}
+
+function runSlideshowTick() {
+    resetSlideshowProgress();
+}
+
+function toggleGalleryFullscreen() {
+    if (!document.fullscreenElement) {
+        activeGalleryModal?.requestFullscreen?.().catch(() => {});
+    } else {
+        document.exitFullscreen?.().catch(() => {});
+    }
+}
+
+function downloadCurrentGalleryFile() {
+    if (!galleryQueue.length) return;
+    const file = galleryQueue[galleryIndex];
+    if (file && file.id) {
+        downloadFile(file.id);
+    }
+}
+
+function closeGalleryModal() {
+    stopGallerySlideshow();
+    if (galleryZoomCleanup) {
+        galleryZoomCleanup();
+        galleryZoomCleanup = null;
+    }
+    if (activeGalleryModal) {
+        if (activeGalleryModal._keyCleanup) activeGalleryModal._keyCleanup();
+        activeGalleryModal.remove();
+        activeGalleryModal = null;
+    }
 }
 
 function setupImageZoomPan({ modal, viewport, wrapper, label, btnIn, btnOut, btnFit, btnReset, btnRotate }) {
