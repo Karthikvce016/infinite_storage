@@ -20,6 +20,7 @@ from sqlalchemy import (
     create_engine,
     Column,
     Integer,
+    BigInteger,
     Float,
     String,
     Text,
@@ -48,7 +49,7 @@ class FileModel(Base):
     id = Column(Integer, primary_key=True, autoincrement=True)
     path = Column(String, nullable=False)
     hash = Column(String, nullable=False)
-    size = Column(Integer, nullable=False)
+    size = Column(BigInteger, nullable=False)
     chunks = Column(Integer, nullable=False)
     folder = Column(String, nullable=False)
     owner = Column(String, nullable=False, default="default")
@@ -63,7 +64,7 @@ class FolderModel(Base):
     __tablename__ = "folders"
     id = Column(Integer, primary_key=True, autoincrement=True)
     name = Column(String, nullable=False)
-    channel_id = Column(Integer, nullable=False)
+    channel_id = Column(BigInteger, nullable=False)
     owner = Column(String, nullable=False, default="default")
     parent_id = Column(Integer, nullable=True, default=None)
     created_at = Column(Float, nullable=False)
