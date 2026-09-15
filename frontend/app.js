@@ -991,6 +991,122 @@ function previewFile(fileId) {
     }
 }
 
+// ══════════════════════════════════════════════
+//  Finder Quick Look
+// ══════════════════════════════════════════════
+let quickLookModal = null;
+
+function quickLookSelected() {
+    if (!selectedFile) {
+        alert('Select a file first, then press Space for Quick Look.');
+        return;
+    }
+    openQuickLook(selectedFile);
+}
+
+function openQuickLook(file) {
+    if (!file || !isPreviewable(file.id)) {
+        alert('This file type cannot be previewed directly. Please download it instead.');
+        return;
+    }
+    closeQuickLook();
+
+    const queue = (allFiles || []).filter(f => isPreviewable(f.id));
+    const start = Math.max(0, queue.findIndex(f => f.id === file.id));
+    const modal = document.createElement('div');
+    modal.className = 'quick-look-overlay';
+    modal.setAttribute('role', 'dialog');
+    modal.setAttribute('aria-modal', 'true');
+    modal.setAttribute('aria-label', `Quick Look ${file.name || file.id}`);
+    quickLookModal = modal;
+    modal.innerHTML = `
+        <div class="quick-look-card">
+            <header class="quick-look-header">
+                <div class="quick-look-file-heading">
+                    <span class="quick-look-icon">${getFileIconSvg(getFileExt(file.id))}</span>
+                    <div>
+                        <strong class="quick-look-title"></strong>
+                        <span class="quick-look-meta"></span>
+                    </div>
+                </div>
+                <div class="quick-look-actions">
+                    <button class="quick-look-download" title="Download file">Download</button>
+                    <button class="quick-look-close" title="Close Quick Look (Space or Esc)" aria-label="Close Quick Look">✕</button>
+                </div>
+            </header>
+            <main class="quick-look-stage">
+                <button class="quick-look-nav prev" title="Previous file (←)" aria-label="Previous file">‹</button>
+                <div class="quick-look-content"></div>
+                <button class="quick-look-nav next" title="Next file (→)" aria-label="Next file">›</button>
+            </main>
+            <footer class="quick-look-footer"><span><kbd>Space</kbd> Close</span><span><kbd>←</kbd> <kbd>→</kbd> Navigate</span><span><kbd>Esc</kbd> Close</span></footer>
+        </div>
+    `;
+    document.body.appendChild(modal);
+
+    let index = start;
+    const title = modal.querySelector('.quick-look-title');
+    const meta = modal.querySelector('.quick-look-meta');
+    const content = modal.querySelector('.quick-look-content');
+    const render = () => {
+        const current = queue[index] || file;
+        const ext = getFileExt(current.id);
+        const url = `/api/folders/${currentFolderId}/preview/${encodeURIComponent(current.id)}`;
+        const label = current.name || current.id;
+        title.textContent = label;
+        title.title = label;
+        meta.textContent = `${ext.toUpperCase().replace('.', '') || 'FILE'}  •  ${formatBytes(current.size || 0)}`;
+        modal.querySelector('.quick-look-nav.prev').disabled = index <= 0;
+        modal.querySelector('.quick-look-nav.next').disabled = index >= queue.length - 1;
+
+        if (['.jpg','.jpeg','.png','.gif','.webp','.bmp','.svg','.ico'].includes(ext)) {
+            content.innerHTML = `<img class="quick-look-image" src="${url}" alt="${escapeAttr(label)}" onerror="this.outerHTML='<div class=\'quick-look-error\'>Unable to load this preview.</div>'">`;
+        } else if (['.mp4','.webm','.mov','.mkv'].includes(ext)) {
+            content.innerHTML = `<video class="quick-look-video" src="${url}" controls autoplay></video>`;
+        } else if (['.mp3','.wav','.ogg','.m4a','.flac'].includes(ext)) {
+            content.innerHTML = `<div class="quick-look-audio-wrap"><div class="quick-look-audio-icon">${getFileIconSvg(ext)}</div><audio class="quick-look-audio" src="${url}" controls autoplay></audio></div>`;
+        } else if (ext === '.pdf') {
+            content.innerHTML = `<iframe class="quick-look-pdf" src="${url}" title="${escapeAttr(label)}"></iframe>`;
+        } else {
+            content.innerHTML = `<div class="quick-look-text-wrap"><div class="quick-look-text-label">Text Preview</div><pre class="quick-look-text"><code></code></pre></div>`;
+            fetch(url).then(async response => {
+                if (!response.ok) throw new Error(`HTTP ${response.status}`);
+                return response.text();
+            }).then(text => { const code = content.querySelector('code'); if (code) code.textContent = text; })
+              .catch(() => { const code = content.querySelector('code'); if (code) code.textContent = 'Unable to load this preview.'; });
+        }
+    };
+
+    modal.querySelector('.quick-look-close').onclick = closeQuickLook;
+    modal.querySelector('.quick-look-download').onclick = () => downloadFile((queue[index] || file).id);
+    modal.querySelector('.quick-look-nav.prev').onclick = () => { if (index > 0) { index -= 1; render(); } };
+    modal.querySelector('.quick-look-nav.next').onclick = () => { if (index < queue.length - 1) { index += 1; render(); } };
+    modal.addEventListener('click', e => { if (e.target === modal) closeQuickLook(); });
+    modal._keyHandler = e => {
+        if (e.key === 'Escape' || e.key === ' ') { e.preventDefault(); closeQuickLook(); }
+        else if (e.key === 'ArrowLeft' && index > 0) { index -= 1; render(); }
+        else if (e.key === 'ArrowRight' && index < queue.length - 1) { index += 1; render(); }
+    };
+    window.addEventListener('keydown', modal._keyHandler);
+    render();
+    requestAnimationFrame(() => modal.classList.add('is-open'));
+}
+
+function closeQuickLook() {
+    if (!quickLookModal) return;
+    if (quickLookModal._keyHandler) window.removeEventListener('keydown', quickLookModal._keyHandler);
+    quickLookModal.remove();
+    quickLookModal = null;
+}
+
+document.addEventListener('keydown', e => {
+    if (quickLookModal || e.defaultPrevented || e.metaKey || e.ctrlKey || e.altKey) return;
+    if (e.key === ' ' && selectedFile) {
+        e.preventDefault();
+        openQuickLook(selectedFile);
+    }
+});
+
 function openGalleryModal() {
     if (activeGalleryModal) {
         closeGalleryModal();
