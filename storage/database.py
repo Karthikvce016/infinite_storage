@@ -150,18 +150,28 @@ class Database:
     def connect(self) -> None:
         if DATABASE_URL:
             url = DATABASE_URL
-            # Railway sometimes provides postgres:// but SQLAlchemy needs postgresql://
+            # Railway / Render sometimes provide postgres:// but SQLAlchemy needs postgresql://
             if url.startswith("postgres://"):
                 url = url.replace("postgres://", "postgresql://", 1)
             log.info("SYSTEM: Connecting to PostgreSQL...")
-            self._engine = create_engine(url, pool_pre_ping=True)
-        else:
-            log.info("SYSTEM: No DATABASE_URL found, falling back to SQLite at %s", DB_PATH)
-            self._engine = create_engine(f"sqlite:///{DB_PATH}", connect_args={"check_same_thread": False})
+            try:
+                self._engine = create_engine(url, pool_pre_ping=True)
+                self._SessionLocal = sessionmaker(bind=self._engine)
+                Base.metadata.create_all(self._engine)
+                log.info("SYSTEM: PostgreSQL connected and tables verified.")
+                return
+            except Exception as exc:
+                log.error("SYSTEM: PostgreSQL connection failed: %s", exc)
+                log.warning("SYSTEM: Falling back to SQLite at %s so the app can start.", DB_PATH)
+                if self._engine:
+                    self._engine.dispose()
+                    self._engine = None
 
+        log.info("SYSTEM: Initializing SQLite at %s", DB_PATH)
+        self._engine = create_engine(f"sqlite:///{DB_PATH}", connect_args={"check_same_thread": False})
         self._SessionLocal = sessionmaker(bind=self._engine)
         Base.metadata.create_all(self._engine)
-        log.info("SYSTEM: Database tables created/verified.")
+        log.info("SYSTEM: SQLite database tables created/verified.")
 
     def close(self) -> None:
         if self._engine:

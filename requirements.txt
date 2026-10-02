@@ -6,5 +6,5 @@ python-multipart
 python-dotenv
 sqlalchemy>=2.0
 asyncpg
-psycopg
+psycopg[binary]
 pyjwt
