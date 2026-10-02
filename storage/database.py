@@ -162,10 +162,10 @@ class Database:
                 return
             except Exception as exc:
                 log.error("SYSTEM: PostgreSQL connection failed: %s", exc)
-                log.warning("SYSTEM: Falling back to SQLite at %s so the app can start.", DB_PATH)
-                if self._engine:
-                    self._engine.dispose()
-                    self._engine = None
+                raise RuntimeError(
+                    "DATABASE_URL is configured but PostgreSQL connection failed. "
+                    "Refusing SQLite fallback in production to prevent index drift."
+                ) from exc
 
         log.info("SYSTEM: Initializing SQLite at %s", DB_PATH)
         self._engine = create_engine(f"sqlite:///{DB_PATH}", connect_args={"check_same_thread": False})

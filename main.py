@@ -50,8 +50,12 @@ async def lifespan(app):
         # 3. Rebuild file index from Telegram (non-destructive — upserts only)
         try:
             summary = await rebuild_index(storage, db, owner="admin")
+            app.state.last_rebuild_summary = summary
+            app.state.last_rebuild_error = None
             log.info("SYSTEM: DB rebuild on startup — %s", summary)
         except Exception as rebuild_err:
+            app.state.last_rebuild_summary = None
+            app.state.last_rebuild_error = str(rebuild_err)
             log.warning("SYSTEM: DB rebuild failed (non-fatal): %s", rebuild_err)
 
     except Exception as exc:

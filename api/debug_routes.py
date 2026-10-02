@@ -6,14 +6,27 @@ and allow manual rebuild of the file index from Telegram.
 """
 
 import logging
+from urllib.parse import urlparse
 from fastapi import APIRouter, Request
 
 from api.auth_routes import require_auth
 from core.db_rebuild import rebuild_index
+from config.settings import DATABASE_URL, STORAGE_CHANNEL_ID
 
 log = logging.getLogger(__name__)
 
 router = APIRouter()
+
+def _db_target() -> str:
+    if not DATABASE_URL:
+        return "sqlite-local"
+    try:
+        parsed = urlparse(DATABASE_URL.replace("postgres://", "postgresql://", 1))
+        host = parsed.hostname or "unknown-host"
+        dbname = (parsed.path or "").lstrip("/") or "unknown-db"
+        return f"postgres://{host}/{dbname}"
+    except Exception:
+        return "postgres://unparseable"
 
 
 @router.get("/debug/status")
@@ -31,6 +44,8 @@ async def debug_status(request: Request):
     # Storage status
     storage_ready = False
     channel_id = None
+    startup_rebuild_summary = getattr(request.app.state, "last_rebuild_summary", None)
+    startup_rebuild_error = getattr(request.app.state, "last_rebuild_error", None)
     if storage:
         try:
             storage_ready = await storage.is_ready()
@@ -40,8 +55,12 @@ async def debug_status(request: Request):
 
     return {
         "owner": owner,
+        "database_target": _db_target(),
+        "configured_storage_channel_id": STORAGE_CHANNEL_ID,
         "storage_connected": storage_ready,
         "storage_channel_id": channel_id,
+        "startup_rebuild_summary": startup_rebuild_summary,
+        "startup_rebuild_error": startup_rebuild_error,
         "folder_count": len(folders),
         "file_count": len(files),
         "total_storage_bytes": total_size,
