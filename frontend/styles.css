@@ -2,7 +2,8 @@
    Telegram Drive — Modern OS File Manager Design System
    ══════════════════════════════════════════════ */
 
-:root {
+:root,
+body[data-theme="dark"] {
     --bg-void: #06080e;
     --bg-deep: #0a0d15;
     --bg-base: #0f131d;
@@ -1307,10 +1308,9 @@ body::after {
 
 
 /* ══════════════════════════════════════════════
-   Finder Glass Refresh
-   A calm macOS-inspired visual layer over the existing UI.
+   Vibrant Liquid Glass Light Theme
    ══════════════════════════════════════════════ */
-:root {
+body[data-theme="light"] {
     --bg-void: #eef1f5;
     --bg-deep: #f4f6f9;
     --bg-base: #f7f8fb;
@@ -1327,12 +1327,12 @@ body::after {
     --text-1: #172033;
     --text-2: #566277;
     --text-3: #8a95a8;
-    --emerald: #3478df;
-    --emerald-bright: #2366cf;
-    --emerald-dim: #4b82d1;
-    --emerald-glow: rgba(52, 120, 223, 0.18);
-    --teal: #55a6d8;
-    --teal-dim: #4a93c2;
+    --emerald: #7c3aed;
+    --emerald-bright: #5b21b6;
+    --emerald-dim: #8b5cf6;
+    --emerald-glow: rgba(124, 58, 237, 0.2);
+    --teal: #ec4899;
+    --teal-dim: #db2777;
     --red: #d9505c;
     --red-glow: rgba(217, 80, 92, 0.12);
     --amber: #d58a23;
@@ -1345,16 +1345,16 @@ body::after {
     --inspector-w: 300px;
 }
 
-html { background: #edf0f5; }
+html { background: var(--bg-void); }
 body {
     background:
         radial-gradient(circle at 12% 8%, rgba(255,255,255,.95), transparent 31%),
-        radial-gradient(circle at 86% 0%, rgba(198,221,250,.42), transparent 29%),
+        radial-gradient(circle at 86% 0%, rgba(240,195,255,.36), transparent 29%),
         linear-gradient(135deg, #edf1f6 0%, #f7f8fb 52%, #e9edf4 100%);
     color: var(--text-1);
     letter-spacing: -0.012em;
 }
-body::after { background: radial-gradient(circle, rgba(94, 150, 225, 0.08) 0%, rgba(151, 185, 226, 0.025) 36%, transparent 68%); }
+body::after { background: radial-gradient(circle, rgba(124, 58, 237, 0.09) 0%, rgba(236, 72, 153, 0.03) 40%, transparent 68%); }
 .particles-container { opacity: .16; }
 .particle { background: #6e9cdb; filter: blur(1px); }
 
@@ -1388,9 +1388,26 @@ body::after { background: radial-gradient(circle, rgba(94, 150, 225, 0.08) 0%, r
 }
 .hamburger-btn, .icon-toggle-btn, .logout-btn { background: rgba(255,255,255,.48); border-color: rgba(72,86,108,.16); color: #647188; }
 .hamburger-btn:hover, .icon-toggle-btn:hover, .icon-toggle-btn.active { background: rgba(255,255,255,.85); color: var(--emerald-bright); border-color: rgba(52,120,223,.38); }
+.theme-toggle-btn {
+    width: 34px; height: 34px; display: inline-flex; align-items: center; justify-content: center;
+    background: rgba(255,255,255,.5); border: 1px solid rgba(72,86,108,.16); border-radius: 10px;
+    color: #647188; cursor: pointer; transition: all var(--fast); position: relative; overflow: hidden;
+}
+.theme-toggle-btn::before {
+    content: ""; position: absolute; inset: -40%;
+    background: conic-gradient(from 0deg, transparent, rgba(124,58,237,.24), transparent, rgba(236,72,153,.22), transparent);
+    opacity: 0; transition: opacity var(--fast); animation: theme-spin 3.5s linear infinite;
+}
+.theme-toggle-btn:hover { border-color: rgba(124,58,237,.45); color: var(--emerald-bright); box-shadow: 0 6px 14px rgba(124,58,237,.15); transform: translateY(-1px); }
+.theme-toggle-btn:hover::before { opacity: .6; }
+.theme-toggle-btn svg { position: relative; z-index: 1; transition: transform var(--fast), opacity var(--fast); }
+.theme-icon-moon { display: none; }
+body[data-theme="dark"] .theme-icon-sun { display: none; }
+body[data-theme="dark"] .theme-icon-moon { display: block; }
+@keyframes theme-spin { to { transform: rotate(360deg); } }
 .brand-pill { background: rgba(255,255,255,.42); border-color: rgba(72,86,108,.14); }
 .brand-pill:hover { background: rgba(255,255,255,.72); border-color: rgba(52,120,223,.3); }
-.brand-dot, .user-dot { background: #3478df; box-shadow: 0 0 7px rgba(52,120,223,.45); }
+.brand-dot, .user-dot { background: var(--emerald); box-shadow: 0 0 8px var(--emerald-glow); }
 .brand-name { color: #273449; }
 .breadcrumb-item.active { background: rgba(52,120,223,.1); color: #2366cf; }
 .search-box input { background: rgba(255,255,255,.64); box-shadow: 0 1px 2px rgba(61,77,102,.04) inset; }
@@ -1441,6 +1458,42 @@ body::after { background: radial-gradient(circle, rgba(94, 150, 225, 0.08) 0%, r
     -webkit-backdrop-filter: blur(16px) saturate(120%);
 }
 .folder-card:hover, .file-grid-card:hover { border-color: rgba(52,120,223,.32); background: rgba(255,255,255,.82); box-shadow: 0 12px 28px rgba(74,91,118,.1); }
+.folder-card, .file-grid-card, .drop-zone, .chip, .gallery-btn, .rebuild-btn, .view-btn, .quick-nav-item, .folder-item {
+    transition: transform var(--fast), box-shadow var(--fast), background var(--fast), border-color var(--fast), color var(--fast);
+}
+.folder-card:hover, .file-grid-card:hover, .drop-zone:hover, .chip:hover, .gallery-btn:hover, .rebuild-btn:hover { transform: translateY(-2px); }
+.file-grid-card::before, .folder-card::before {
+    content: ""; position: absolute; inset: 0; pointer-events: none; border-radius: inherit;
+    background: linear-gradient(130deg, rgba(255,255,255,.28), transparent 40%, rgba(236,72,153,.06) 78%, transparent 100%);
+    opacity: 0; transition: opacity var(--fast);
+}
+.file-grid-card:hover::before, .folder-card:hover::before { opacity: 1; }
+
+/* Dark theme overrides: vibrant glass with non-generic colors */
+body[data-theme="dark"] {
+    --bg-void: #06070f;
+    --bg-deep: #0b0f1a;
+    --bg-base: #12182a;
+    --bg-surface: rgba(22, 29, 48, 0.55);
+    --bg-elevated: rgba(28, 36, 58, 0.82);
+    --bg-hover: rgba(255, 255, 255, 0.05);
+    --bg-active: rgba(139, 92, 246, 0.22);
+    --glass-heavy: rgba(12, 15, 28, 0.7);
+    --glass-mid: rgba(17, 22, 37, 0.62);
+    --glass-card: rgba(27, 35, 56, 0.48);
+    --border: rgba(180, 164, 255, 0.22);
+    --border-subtle: rgba(217, 185, 255, 0.08);
+    --border-accent: rgba(236, 72, 153, 0.4);
+    --text-1: #f7f5ff;
+    --text-2: #c5c0e2;
+    --text-3: #8d87b1;
+    --emerald: #c084fc;
+    --emerald-bright: #f0abfc;
+    --emerald-dim: #a855f7;
+    --emerald-glow: rgba(192, 132, 252, 0.25);
+    --teal: #22d3ee;
+    --teal-dim: #06b6d4;
+}
 .file-grid-card.selected { border-color: #3478df; background: rgba(52,120,223,.1); box-shadow: 0 0 0 1px #3478df, 0 10px 28px rgba(52,120,223,.1); }
 .card-thumb-box { background: rgba(236,241,248,.65); border-color: rgba(72,86,108,.1); }
 .card-type-icon, .file-icon-small svg, .empty-icon-shield { stroke: #3478df; color: #3478df; }

@@ -74,11 +74,16 @@ const contextMenu = $("context-menu");
 const breadcrumbBar = $("breadcrumb-bar");
 const searchInput = $("search-input");
 const searchClearBtn = $("search-clear-btn");
+const themeToggleBtn = $("theme-toggle-btn");
+
+const THEME_KEY = "telegram-drive-theme";
 
 // ══════════════════════════════════════════════
 //  Init — check auth on load
 // ══════════════════════════════════════════════
 document.addEventListener("DOMContentLoaded", async () => {
+    initTheme();
+    bindInteractiveEffects();
     try {
         const res = await fetch("/api/auth/check");
         if (res.ok) {
@@ -91,6 +96,33 @@ document.addEventListener("DOMContentLoaded", async () => {
     } catch (_) { }
     showLoginScreen();
 });
+
+function initTheme() {
+    const storedTheme = localStorage.getItem(THEME_KEY);
+    const systemLight = window.matchMedia && window.matchMedia("(prefers-color-scheme: light)").matches;
+    const resolved = storedTheme || (systemLight ? "light" : "dark");
+    applyTheme(resolved);
+}
+
+function applyTheme(theme) {
+    document.body.dataset.theme = theme === "light" ? "light" : "dark";
+    localStorage.setItem(THEME_KEY, document.body.dataset.theme);
+    if (themeToggleBtn) {
+        themeToggleBtn.setAttribute("aria-label", `Switch to ${theme === "light" ? "dark" : "light"} mode`);
+    }
+}
+
+function toggleTheme() {
+    const current = document.body.dataset.theme === "light" ? "light" : "dark";
+    applyTheme(current === "light" ? "dark" : "light");
+}
+
+function bindInteractiveEffects() {
+    document.addEventListener("mousemove", (event) => {
+        document.documentElement.style.setProperty("--mx", `${event.clientX}px`);
+        document.documentElement.style.setProperty("--my", `${event.clientY}px`);
+    });
+}
 
 // ══════════════════════════════════════════════
 //  Auth Flow (Password)
