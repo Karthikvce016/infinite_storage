@@ -44,12 +44,14 @@ async def debug_status(request: Request):
     # Storage status
     storage_ready = False
     channel_id = None
+    is_bot = False
     startup_rebuild_summary = getattr(request.app.state, "last_rebuild_summary", None)
     startup_rebuild_error = getattr(request.app.state, "last_rebuild_error", None)
     if storage:
         try:
             storage_ready = await storage.is_ready()
             channel_id = getattr(storage, '_storage_channel_id', None)
+            is_bot = getattr(storage, 'is_bot', False)
         except Exception as e:
             log.warning("Storage is_ready check failed: %s", e)
 
@@ -59,6 +61,7 @@ async def debug_status(request: Request):
         "configured_storage_channel_id": STORAGE_CHANNEL_ID,
         "storage_connected": storage_ready,
         "storage_channel_id": channel_id,
+        "is_bot": is_bot,
         "startup_rebuild_summary": startup_rebuild_summary,
         "startup_rebuild_error": startup_rebuild_error,
         "folder_count": len(folders),
@@ -81,8 +84,14 @@ async def debug_rebuild(request: Request):
 
     try:
         summary = await rebuild_index(storage, db, owner=owner)
+        msg = (
+            "Telegram Bot mode active: message history scan is restricted for bots. "
+            "PostgreSQL is the authoritative file index."
+            if summary.get("bot_mode")
+            else "Rebuild completed"
+        )
         return {
-            "message": "Rebuild completed",
+            "message": msg,
             "summary": summary,
         }
     except Exception as exc:

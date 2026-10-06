@@ -34,6 +34,12 @@ class StorageProvider(ABC):
         """Return True if the backend is connected and operational."""
         ...
 
+    @property
+    def is_bot(self) -> bool:
+        """Return True if running as a Telegram bot account (limited history access)."""
+        return False
+
+
     # ── Folder operations ────────────────────────────────────
     @abstractmethod
     async def create_folder(self, name: str) -> dict:

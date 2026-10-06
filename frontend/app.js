@@ -1768,7 +1768,13 @@ async function rebuildIndex() {
         const data = await res.json();
         if (!res.ok) throw new Error(data.error || "Sync failed");
 
-        alert(`Vault Rebuilt: ${data.summary.files} files, ${data.summary.folders} folders indexed.`);
+        if (data.summary && data.summary.bot_mode) {
+            alert("Bot mode active: Channel history scan is unavailable for Telegram bot accounts. All uploaded files are indexed directly in PostgreSQL.");
+        } else if (data.summary) {
+            alert(`Vault Rebuilt: ${data.summary.files} files, ${data.summary.folders} folders indexed.`);
+        } else {
+            alert(data.message || "Sync completed.");
+        }
         loadFolders();
     } catch (err) {
         alert("Rebuild failed: " + err.message);

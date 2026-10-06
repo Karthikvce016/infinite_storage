@@ -52,6 +52,19 @@ async def rebuild_index(
     ))
     log.info("SYSTEM: Default folder '%s' ensured in DB", DEFAULT_FOLDER_NAME)
 
+    if getattr(storage, "is_bot", False):
+        log.info(
+            "SYSTEM: Telegram Bot mode detected — bot accounts cannot read channel history "
+            "(GetHistoryRequest is restricted to user accounts). Skipping channel scan. "
+            "PostgreSQL database is the authoritative file index."
+        )
+        return {
+            "folders": 1,
+            "files": 0,
+            "bot_mode": True,
+            "message": "Bot mode active: channel history scan skipped; PostgreSQL holds file records.",
+        }
+
     # ── STEP 2: Scan the storage channel directly ──
     log.info("SYSTEM: Scanning Telegram channel for files...")
     messages = await storage.scan_folder_messages(DEFAULT_FOLDER_NAME)

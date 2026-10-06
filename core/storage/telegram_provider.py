@@ -61,6 +61,12 @@ class TelegramProvider(StorageProvider):
         self._folder_cache: dict[str, Channel] = {}
         self._storage_channel_id: Optional[int] = None
         self._db = None  # Set via set_db() for channel ID lookups
+        self._is_bot: bool = False  # Set after connect()
+
+    @property
+    def is_bot(self) -> bool:
+        """Return True if running as a Telegram bot."""
+        return self._is_bot
 
     def set_db(self, db) -> None:
         """Give the provider access to the database for resolving folder channel IDs."""
@@ -98,6 +104,7 @@ class TelegramProvider(StorageProvider):
                         StringSession(), API_ID, API_HASH
                     )
                     await self.client.start(bot_token=BOT_TOKEN)
+                    self._is_bot = True
                 else:
                     raise
         elif BOT_TOKEN:
@@ -106,6 +113,7 @@ class TelegramProvider(StorageProvider):
                 StringSession(), API_ID, API_HASH
             )
             await self.client.start(bot_token=BOT_TOKEN)
+            self._is_bot = True
         else:
             raise RuntimeError(
                 "Neither SESSION_STRING nor BOT_TOKEN is set. "
@@ -122,10 +130,13 @@ class TelegramProvider(StorageProvider):
 
         # Verify connection
         me = await self.client.get_me()
+        if getattr(me, "bot", False):
+            self._is_bot = True
         log.info(
-            "SYSTEM: Connected successfully — @%s (id=%s)",
+            "SYSTEM: Connected successfully — @%s (id=%s, is_bot=%s)",
             getattr(me, "username", None) or "unnamed",
             getattr(me, "id", None),
+            self._is_bot,
         )
 
         # Store the storage channel ID as an integer.
@@ -297,7 +308,22 @@ class TelegramProvider(StorageProvider):
 
     # ── Rebuild support ──────────────────────────────────────
     async def scan_folder_messages(self, folder_name: str) -> List[dict]:
+        """Scan channel message history for DB rebuild.
+
+        NOTE: Telegram Bot accounts CANNOT use GetHistoryRequest /
+        iter_messages().  When running as a bot the scan is skipped and
+        the caller should rely on PostgreSQL as the authoritative index
+        (uploads already record metadata at write time).
+        """
         assert self.client is not None
+
+        if self._is_bot:
+            log.warning(
+                "SYSTEM: scan_folder_messages — skipped (bot accounts cannot "
+                "read channel history via GetHistoryRequest). "
+                "PostgreSQL is the authoritative file index in bot mode."
+            )
+            return []
 
         if not self._storage_channel_id:
             log.warning("SYSTEM: scan_folder_messages — _storage_channel_id is not set")

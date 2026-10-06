@@ -96,7 +96,7 @@ def main() -> None:
         print(
             "\n⚠  No Telegram auth configured.\n"
             "   Choose one of these approaches and set the matching env var in .env:\n\n"
-            "   A) Bot mode (decommended for 24x7 services like Render):\n"
+            "   A) Bot mode (recommended for 24x7 services like Render):\n"
             "      1. Talk to @BotFather on Telegram and create a bot.\n"
             "      2. Copy the token to BOT_TOKEN in .env.\n"
             "      3. Add the bot as an admin to your private storage channel.\n"
