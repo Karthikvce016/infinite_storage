@@ -9,13 +9,20 @@ Architecture:
 """
 
 import logging
-import os
 import sys
 from contextlib import asynccontextmanager
 
 import uvicorn
 
-from config.settings import API_ID, API_HASH, BOT_TOKEN, DATABASE_URL, STORAGE_CHANNEL_ID, SESSION_STRING
+from config.settings import (
+    API_ID,
+    API_HASH,
+    BOT_TOKEN,
+    DATABASE_URL,
+    STORAGE_CHANNEL_ID,
+    SESSION_STRING,
+    env_int,
+)
 from storage.database import Database
 from core.storage.telegram_provider import TelegramProvider
 from core.db_rebuild import rebuild_index
@@ -131,7 +138,8 @@ def main() -> None:
         log.info("SYSTEM: No DATABASE_URL found — using local SQLite")
 
     # Launch uvicorn
-    port = int(os.environ.get("PORT", 8000))
+    # Blank PORT ("PORT=" in .env) must not crash startup.
+    port = env_int("PORT", 8000)
     log.info("SYSTEM: Starting Web API on http://0.0.0.0:%d", port)
     uvicorn.run(app, host="0.0.0.0", port=port)
 

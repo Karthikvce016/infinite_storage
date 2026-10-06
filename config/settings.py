@@ -13,32 +13,62 @@ from dotenv import load_dotenv
 
 load_dotenv()
 
+
+# ──────────────────────────────────────────────
+# Env helpers — a blank value ("KEY=" in .env) is treated as unset.
+# Without this, an empty numeric key would raise at import time and the whole
+# app would fail to boot.
+# ──────────────────────────────────────────────
+def env_str(name: str, default: str = "") -> str:
+    """Read a string env var, falling back when it is missing or blank."""
+    value = os.getenv(name)
+    return value if value is not None and value.strip() else default
+
+
+def env_int(name: str, default: int) -> int:
+    """Read an int env var, falling back when it is missing, blank or invalid."""
+    raw = env_str(name)
+    try:
+        return int(raw)
+    except ValueError:
+        return default
+
+
+def env_float(name: str, default: float) -> float:
+    """Read a float env var, falling back when it is missing, blank or invalid."""
+    raw = env_str(name)
+    try:
+        return float(raw)
+    except ValueError:
+        return default
+
+
 # ──────────────────────────────────────────────
 # Telegram API credentials (REQUIRED)
 # ──────────────────────────────────────────────
-API_ID: int = int(os.getenv("API_ID", "0"))
-API_HASH: str = os.getenv("API_HASH", "")
+API_ID: int = env_int("API_ID", 0)
+API_HASH: str = env_str("API_HASH")
 
 # Bot token from @BotFather (used for Bot API mode)
-BOT_TOKEN: str = os.getenv("BOT_TOKEN", "")
+BOT_TOKEN: str = env_str("BOT_TOKEN")
 
 # User session string (used for full API access — bots can't create channels)
 # Generate via: python generate_session.py
-SESSION_STRING: str = os.getenv("SESSION_STRING", "")
+SESSION_STRING: str = env_str("SESSION_STRING")
 
 # The channel where the bot stores files.
 # Can be a numeric ID (e.g. -1001234567890) or a username (e.g. @my_storage).
-STORAGE_CHANNEL_ID: str = os.getenv("STORAGE_CHANNEL_ID", "")
+STORAGE_CHANNEL_ID: str = env_str("STORAGE_CHANNEL_ID")
 
 # ──────────────────────────────────────────────
 # Web auth – simple password for personal use
 # ──────────────────────────────────────────────
-APP_PASSWORD: str = os.getenv("APP_PASSWORD", "admin")
+APP_PASSWORD: str = env_str("APP_PASSWORD", "admin")
 
 # ──────────────────────────────────────────────
 # PostgreSQL (Railway / Supabase / local)
 # ──────────────────────────────────────────────
-DATABASE_URL: str = os.getenv("DATABASE_URL", "")
+DATABASE_URL: str = env_str("DATABASE_URL")
 
 # ──────────────────────────────────────────────
 # Folder prefix used to identify storage channels
@@ -51,7 +81,7 @@ DEFAULT_FOLDER_NAME: str = "General"
 # ──────────────────────────────────────────────
 _PROJECT_ROOT: Path = Path(__file__).resolve().parent.parent
 
-APP_DIR: Path = Path(os.getenv("APP_DATA_DIR", str(_PROJECT_ROOT)))
+APP_DIR: Path = Path(env_str("APP_DATA_DIR", str(_PROJECT_ROOT)))
 APP_DIR.mkdir(parents=True, exist_ok=True)
 
 DB_PATH: Path = APP_DIR / "index.db"
@@ -73,5 +103,5 @@ MAX_CONCURRENT_DOWNLOADS: int = 1
 # ──────────────────────────────────────────────
 # Rate limiting — anti-ban
 # ──────────────────────────────────────────────
-RATE_LIMIT_DELAY: float = float(os.getenv("RATE_LIMIT_DELAY", "2.0"))       # seconds between API calls
-MAX_REQUESTS_PER_MINUTE: int = int(os.getenv("MAX_REQUESTS_PER_MINUTE", "20"))
+RATE_LIMIT_DELAY: float = env_float("RATE_LIMIT_DELAY", 2.0)        # seconds between API calls
+MAX_REQUESTS_PER_MINUTE: int = env_int("MAX_REQUESTS_PER_MINUTE", 20)

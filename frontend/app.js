@@ -1,13 +1,12 @@
 /**
- * app.js — Telegram Drive (Obsidian OS File Manager Edition)
+ * app.js — Telegram Drive
  *
- * Features:
- * - 3-Pane Modern OS / File Manager Grid Architecture
- * - Dual View: Rich Visual Card Grid + Streamlined List Table
- * - Interactive Details Inspector Sidebar
- * - Real-time Category Filtering & Unified Search
- * - Floating Action Dock
- * - Complete Fullscreen Lightbox Previews (Image Pan/Zoom/Rotate, Video/Audio Streaming, PDF & Code)
+ * Features
+ * - Three switchable appearances: terminal (green CRT), liquid glass light & dark
+ * - 3-pane workspace: folder sidebar, browser (card grid + list table), details inspector
+ * - Live search, category filters, sorting, drag & drop uploads
+ * - Quick Look (Space) and a Google-Photos-style gallery viewer with side-by-side,
+ *   slideshow, image zoom/pan/rotate and scrollable text/code previews
  */
 
 // ══════════════════════════════════════════════
@@ -74,15 +73,12 @@ const contextMenu = $("context-menu");
 const breadcrumbBar = $("breadcrumb-bar");
 const searchInput = $("search-input");
 const searchClearBtn = $("search-clear-btn");
-const themeToggleBtn = $("theme-toggle-btn");
-
-const THEME_KEY = "telegram-drive-theme";
 
 // ══════════════════════════════════════════════
 //  Init — check auth on load
 // ══════════════════════════════════════════════
 document.addEventListener("DOMContentLoaded", async () => {
-    initTheme();
+    initAppearance();
     bindInteractiveEffects();
     try {
         const res = await fetch("/api/auth/check");
@@ -97,24 +93,51 @@ document.addEventListener("DOMContentLoaded", async () => {
     showLoginScreen();
 });
 
-function initTheme() {
-    const storedTheme = localStorage.getItem(THEME_KEY);
-    const systemLight = window.matchMedia && window.matchMedia("(prefers-color-scheme: light)").matches;
-    const resolved = storedTheme || (systemLight ? "light" : "dark");
-    applyTheme(resolved);
+// ══════════════════════════════════════════════
+//  Appearance — terminal · liquid light · liquid dark
+//  (the same preference drives <html data-ui> + <html data-mode>,
+//   which the stylesheet maps onto its design tokens)
+// ══════════════════════════════════════════════
+const APPEARANCE_KEY = "td.appearance";
+const APPEARANCES = ["terminal", "liquid-light", "liquid-dark"];
+const APPEARANCE_TINT = {
+    "terminal": "#040705",
+    "liquid-light": "#ece9dc",
+    "liquid-dark": "#0b0c07",
+};
+
+function readStoredAppearance() {
+    let saved = "liquid-dark";
+    try { saved = localStorage.getItem(APPEARANCE_KEY) || saved; } catch (_) { }
+    return APPEARANCES.includes(saved) ? saved : "liquid-dark";
 }
 
-function applyTheme(theme) {
-    document.body.dataset.theme = theme === "light" ? "light" : "dark";
-    localStorage.setItem(THEME_KEY, document.body.dataset.theme);
-    if (themeToggleBtn) {
-        themeToggleBtn.setAttribute("aria-label", `Switch to ${theme === "light" ? "dark" : "light"} mode`);
-    }
+function applyAppearance(name) {
+    const appearance = APPEARANCES.includes(name) ? name : "liquid-dark";
+    const root = document.documentElement;
+
+    root.dataset.ui = appearance === "terminal" ? "terminal" : "liquid";
+    root.dataset.mode = appearance === "liquid-light" ? "light" : "dark";
+
+    try { localStorage.setItem(APPEARANCE_KEY, appearance); } catch (_) { }
+
+    document.querySelectorAll(".appearance-btn").forEach(btn => {
+        const isActive = btn.dataset.appearance === appearance;
+        btn.classList.toggle("active", isActive);
+        btn.setAttribute("aria-pressed", String(isActive));
+    });
+
+    const meta = $("meta-theme-color");
+    if (meta) meta.setAttribute("content", APPEARANCE_TINT[appearance]);
 }
 
-function toggleTheme() {
-    const current = document.body.dataset.theme === "light" ? "light" : "dark";
-    applyTheme(current === "light" ? "dark" : "light");
+function initAppearance() {
+    applyAppearance(readStoredAppearance());
+}
+
+/** Called by the switcher buttons in the markup. */
+function setAppearance(name) {
+    applyAppearance(name);
 }
 
 function bindInteractiveEffects() {
@@ -138,6 +161,11 @@ function showDriveScreen(user) {
 
     if (user && userInfo) {
         userInfo.textContent = user.username || "Admin";
+    }
+
+    // Narrow windows get the details panel as a slide-over, closed by default.
+    if (window.matchMedia && window.matchMedia("(max-width: 1080px)").matches) {
+        closeInspector();
     }
 
     navigateToFolder(null, "Root");
@@ -298,7 +326,7 @@ async function loadFolders() {
                     <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
                         <path d="M22 19a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h5l2 3h9a2 2 0 0 1 2 2z"/>
                     </svg>
-                    <span class="folder-name" style="color: var(--text-3);font-size:0.8rem;">No folders created</span>
+                    <span class="folder-name">No folders created</span>
                 `;
                 folderList.appendChild(li);
             } else {
@@ -310,7 +338,7 @@ async function loadFolders() {
                             <path d="M22 19a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h5l2 3h9a2 2 0 0 1 2 2z"/>
                         </svg>
                         <span class="folder-name">${escapeHtml(f.name)}</span>
-                        <button class="btn-icon folder-more" onclick="event.stopPropagation(); showFolderMenu(event, ${f.id}, '${escapeAttr(f.name)}')" title="Options">
+                        <button class="folder-more" onclick="event.stopPropagation(); showFolderMenu(event, ${f.id}, ${jsStr(f.name)})" title="Options">
                             <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
                                 <circle cx="12" cy="5" r="1"/><circle cx="12" cy="12" r="1"/><circle cx="12" cy="19" r="1"/>
                             </svg>
@@ -363,98 +391,157 @@ document.addEventListener("click", () => {
     if (contextMenu) contextMenu.classList.add("hidden");
 });
 
-async function renameFolderAction() {
+function renameFolderAction() {
     contextMenu.classList.add("hidden");
-    const newName = prompt(`Rename folder "${contextMenuFolderName}" to:`, contextMenuFolderName);
-    if (!newName || newName.trim() === contextMenuFolderName) return;
+    const folderId = contextMenuFolderId;
+    const original = contextMenuFolderName;
 
-    try {
-        const res = await fetch(`/api/folders/${contextMenuFolderId}`, {
-            method: "PUT",
-            headers: { "Content-Type": "application/json" },
-            body: JSON.stringify({ name: newName.trim() }),
-        });
-        if (!res.ok) {
-            const data = await res.json();
-            alert(data.detail || "Rename failed");
-            return;
-        }
-        loadFolders();
-    } catch (err) {
-        alert("Failed to rename folder: " + err.message);
-    }
+    openModal({
+        title: "Rename folder",
+        input: { label: "Folder name", value: original },
+        confirmLabel: "Rename",
+        onSubmit: async (newName) => {
+            if (!newName || newName === original) return false;
+            const res = await fetch(`/api/folders/${folderId}`, {
+                method: "PUT",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify({ name: newName }),
+            });
+            const data = await res.json().catch(() => ({}));
+            if (!res.ok) throw new Error(data.detail || "Rename failed");
+            loadFolders();
+        },
+    });
 }
 
 async function deleteFolderAction() {
     contextMenu.classList.add("hidden");
-    if (!confirm(`Delete folder "${contextMenuFolderName}" and ALL its contents?`)) return;
+    const folderId = contextMenuFolderId;
+    const name = contextMenuFolderName;
+
+    const ok = await confirmDialog({
+        title: "Delete folder",
+        message: `“${name}” and every file inside it will be removed from Telegram storage. This cannot be undone.`,
+        confirmLabel: "Delete folder",
+    });
+    if (!ok) return;
 
     try {
-        const res = await fetch(`/api/folders/${contextMenuFolderId}`, {
-            method: "DELETE",
-        });
-        if (!res.ok) {
-            const data = await res.json();
-            alert(data.detail || "Delete failed");
-            return;
-        }
+        const res = await fetch(`/api/folders/${folderId}`, { method: "DELETE" });
+        const data = await res.json().catch(() => ({}));
+        if (!res.ok) throw new Error(data.detail || "Delete failed");
         loadFolders();
     } catch (err) {
-        alert("Failed to delete folder: " + err.message);
+        showErrorToast(err.message);
     }
 }
 
-// ── Create folder modal ──
-function showCreateFolderModal() {
-    if (currentFolderId !== null) {
-        modalTitle.textContent = `New Sub-folder in "${currentFolderName}"`;
-    } else {
-        modalTitle.textContent = "New Vault Folder";
+// ── Dialog (create / rename / confirm) ──
+let modalSubmit = null;
+let modalOnClose = null;
+
+/**
+ * openModal({ title, message?, input?, confirmLabel?, danger?, onSubmit })
+ * `input: null` hides the text field (confirm dialogs); `onSubmit` may be async
+ * and should throw to display an inline error instead of closing.
+ */
+function openModal({ title, message = "", input = null, confirmLabel = "Create", danger = false, onSubmit }) {
+    modalTitle.textContent = title;
+
+    const messageEl = $("modal-message");
+    if (messageEl) {
+        messageEl.textContent = message;
+        messageEl.classList.toggle("hidden", !message);
     }
-    modalInput.value = "";
+
+    const field = $("modal-field");
+    const fieldLabel = field ? field.querySelector(".field-label") : null;
+    if (fieldLabel && input && input.label) fieldLabel.textContent = input.label;
+    if (field) field.classList.toggle("hidden", !input);
+    modalInput.value = input ? (input.value || "") : "";
+
     modalError.classList.add("hidden");
-    modalConfirm.textContent = "Create";
+    modalConfirm.textContent = confirmLabel;
+    modalConfirm.classList.toggle("btn-danger", !!danger);
+
+    modalSubmit = onSubmit || null;
+    modalOnClose = null;
     modalOverlay.classList.remove("hidden");
-    modalInput.focus();
+    if (input) modalInput.focus();
 }
 
 function closeModal() {
     modalOverlay.classList.add("hidden");
+    modalSubmit = null;
+    const onClose = modalOnClose;
+    modalOnClose = null;
+    if (onClose) onClose();
 }
 
-modalInput?.addEventListener("keydown", (e) => { if (e.key === "Enter") confirmModal(); });
-
 async function confirmModal() {
-    const name = modalInput.value.trim();
-    if (!name) {
-        modalError.textContent = "Folder name is required";
+    if (!modalSubmit) return closeModal();
+
+    const field = $("modal-field");
+    const needsInput = field ? !field.classList.contains("hidden") : false;
+    const value = modalInput.value.trim();
+    if (needsInput && !value) {
+        modalError.textContent = "This field is required";
         modalError.classList.remove("hidden");
         return;
     }
 
+    modalConfirm.disabled = true;
     try {
-        const body = { name };
-        if (currentFolderId !== null) {
-            body.parent_id = currentFolderId;
-        }
-
-        const res = await fetch("/api/folders", {
-            method: "POST",
-            headers: { "Content-Type": "application/json" },
-            body: JSON.stringify(body),
-        });
-        const data = await res.json();
-        if (!res.ok) {
-            modalError.textContent = data.detail || "Failed to create folder";
-            modalError.classList.remove("hidden");
-            return;
-        }
-        closeModal();
-        loadFolders();
+        const keepOpen = await modalSubmit(value);
+        if (keepOpen !== false) closeModal();
     } catch (err) {
-        modalError.textContent = err.message;
+        modalError.textContent = err.message || "Something went wrong";
         modalError.classList.remove("hidden");
+    } finally {
+        modalConfirm.disabled = false;
     }
+}
+
+/** Styled replacement for window.confirm(). */
+function confirmDialog({ title, message, confirmLabel = "Confirm", danger = true }) {
+    return new Promise(resolve => {
+        let answered = false;
+        openModal({
+            title, message, input: null, confirmLabel, danger,
+            onSubmit: () => { answered = true; resolve(true); return true; },
+        });
+        modalOnClose = () => { if (!answered) resolve(false); };
+    });
+}
+
+modalInput?.addEventListener("keydown", (e) => { if (e.key === "Enter") confirmModal(); });
+
+window.addEventListener("keydown", (e) => {
+    if (modalOverlay.classList.contains("hidden")) return;
+    if (e.key === "Escape") { e.preventDefault(); closeModal(); }
+    else if (e.key === "Enter") { e.preventDefault(); confirmModal(); }
+});
+
+function showCreateFolderModal() {
+    const inFolder = currentFolderId !== null;
+    openModal({
+        title: inFolder ? `New sub-folder in “${currentFolderName}”` : "New vault folder",
+        input: { label: "Folder name", value: "" },
+        confirmLabel: "Create",
+        onSubmit: async (name) => {
+            const body = { name };
+            if (inFolder) body.parent_id = currentFolderId;
+
+            const res = await fetch("/api/folders", {
+                method: "POST",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify(body),
+            });
+            const data = await res.json().catch(() => ({}));
+            if (!res.ok) throw new Error(data.detail || "Failed to create folder");
+            loadFolders();
+        },
+    });
 }
 
 // ══════════════════════════════════════════════
@@ -487,11 +574,12 @@ function getFilteredFiles() {
         // Category filter
         if (currentCategory === "all") return true;
         const ext = getFileExt(file.name);
-        if (currentCategory === "images") return ['.jpg', '.jpeg', '.png', '.gif', '.webp', '.bmp', '.svg', '.ico'].includes(ext);
-        if (currentCategory === "video") return ['.mp4', '.webm', '.mov', '.mkv', '.avi', '.flv'].includes(ext);
-        if (currentCategory === "docs") return ['.pdf', '.txt', '.doc', '.docx', '.xls', '.xlsx', '.ppt', '.pptx', '.md', '.json', '.csv'].includes(ext);
-        if (currentCategory === "audio") return ['.mp3', '.wav', '.ogg', '.m4a', '.flac', '.aac'].includes(ext);
-        if (currentCategory === "archives") return ['.zip', '.rar', '.7z', '.tar', '.gz', '.bz2', '.iso'].includes(ext);
+        if (currentCategory === "images") return IMAGE_EXTS.includes(ext);
+        if (currentCategory === "video") return VIDEO_EXTS.includes(ext) || ['.avi', '.flv', '.wmv', '.mpeg', '.mpg', '.3gp'].includes(ext);
+        if (currentCategory === "docs") return ext === '.pdf' || TEXT_EXTS.includes(ext)
+            || ['.doc', '.docx', '.xls', '.xlsx', '.ppt', '.pptx', '.odt', '.ods', '.odp', '.rtf', '.epub'].includes(ext);
+        if (currentCategory === "audio") return AUDIO_EXTS.includes(ext);
+        if (currentCategory === "archives") return ['.zip', '.rar', '.7z', '.tar', '.gz', '.bz2', '.xz', '.iso', '.dmg'].includes(ext);
         return true;
     }).sort((a, b) => {
         let valA = a[sortKey];
@@ -554,9 +642,9 @@ function renderCardGrid(files) {
                 </div>
             </div>
             <div class="card-actions-row" onclick="event.stopPropagation()">
-                ${previewable ? `<button class="card-btn" onclick="previewFile('${escapeAttr(file.id)}')" title="Preview">View</button>` : ''}
-                <button class="card-btn" onclick="downloadFile('${escapeAttr(file.id)}')" title="Download">Get</button>
-                <button class="card-btn delete-btn" onclick="deleteFile('${escapeAttr(file.id)}')" title="Delete">✕</button>
+                ${previewable ? `<button class="card-btn" onclick="previewFile(${jsStr(file.id)})" title="Preview">View</button>` : ''}
+                <button class="card-btn" onclick="downloadFile(${jsStr(file.id)})" title="Download">Get</button>
+                <button class="card-btn delete-btn" onclick="deleteFile(${jsStr(file.id)})" title="Delete">✕</button>
             </div>
         `;
 
@@ -597,9 +685,9 @@ function renderListTable(files) {
             <td class="col-size">${formatBytes(file.size)}</td>
             <td>
                 <div class="actions" onclick="event.stopPropagation()">
-                    ${previewable ? `<button class="btn-action preview" onclick="previewFile('${escapeAttr(file.id)}')" title="Preview">Preview</button>` : ''}
-                    <button class="btn-action download" onclick="downloadFile('${escapeAttr(file.id)}')">Download</button>
-                    <button class="btn-action delete" onclick="deleteFile('${escapeAttr(file.id)}')">Delete</button>
+                    ${previewable ? `<button class="btn-action preview" onclick="previewFile(${jsStr(file.id)})" title="Preview">Preview</button>` : ''}
+                    <button class="btn-action download" onclick="downloadFile(${jsStr(file.id)})">Download</button>
+                    <button class="btn-action delete" onclick="deleteFile(${jsStr(file.id)})">Delete</button>
                 </div>
             </td>
         `;
@@ -670,7 +758,7 @@ function updateInspector() {
                 </div>
                 <div class="detail-row">
                     <span class="detail-k">Storage</span>
-                    <span class="detail-v" style="color:var(--emerald-bright)">Telegram Doc (Raw)</span>
+                    <span class="detail-v" style="color:var(--accent)">Telegram Doc (Raw)</span>
                 </div>
                 <div class="detail-row">
                     <span class="detail-k">Compression</span>
@@ -680,16 +768,16 @@ function updateInspector() {
 
             <div class="inspector-actions-box">
                 ${previewable ? `
-                    <button class="inspector-action-btn primary" onclick="previewFile('${escapeAttr(selectedFile.id)}')">
+                    <button class="inspector-action-btn primary" onclick="previewFile(${jsStr(selectedFile.id)})">
                         <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/><circle cx="12" cy="12" r="3"/></svg>
                         Full Preview
                     </button>
                 ` : ''}
-                <button class="inspector-action-btn secondary" onclick="downloadFile('${escapeAttr(selectedFile.id)}')">
+                <button class="inspector-action-btn secondary" onclick="downloadFile(${jsStr(selectedFile.id)})">
                     <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="17 8 12 3 7 8"/><line x1="12" y1="3" x2="12" y2="15"/></svg>
                     Download File
                 </button>
-                <button class="inspector-action-btn danger" onclick="deleteFile('${escapeAttr(selectedFile.id)}')">
+                <button class="inspector-action-btn danger" onclick="deleteFile(${jsStr(selectedFile.id)})">
                     <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="3 6 5 6 21 6"/><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/></svg>
                     Delete from Vault
                 </button>
@@ -762,7 +850,7 @@ function sortFiles(key) {
 // ══════════════════════════════════════════════
 function triggerUpload() {
     if (currentFolderId === null) {
-        alert("Please navigate into a vault folder first before uploading files.");
+        showErrorToast("Open a folder first: uploads are stored inside folders.");
         return;
     }
     fileInput.click();
@@ -794,7 +882,7 @@ function setupDragDrop() {
         e.preventDefault();
         dropZone.classList.remove("drag-over");
         if (currentFolderId === null) {
-            alert("Please navigate into a folder first before uploading files.");
+            showErrorToast("Open a folder first: uploads are stored inside folders.");
             return;
         }
         if (e.dataTransfer.files.length > 0) handleFiles(e.dataTransfer.files);
@@ -833,7 +921,6 @@ async function uploadFile(file) {
                     progressFill.style.width = "100%";
                     uploadPercent.textContent = "100%";
                     uploadFilename.textContent = `Uploaded ${file.name} ✓`;
-                    loadFiles();
                     resolve();
                 } else {
                     try {
@@ -858,7 +945,7 @@ async function uploadFile(file) {
         loadFiles();
     } catch (err) {
         uploadFilename.textContent = `Error: ${err.message}`;
-        progressFill.style.background = "var(--red)";
+        progressFill.style.background = "var(--danger)";
         setTimeout(() => {
             progressCont.classList.add("hidden");
             progressFill.style.background = "";
@@ -871,17 +958,13 @@ async function uploadFile(file) {
 // ══════════════════════════════════════════════
 async function downloadFile(fileId) {
     const url = `/api/folders/${currentFolderId}/download/${encodeURIComponent(fileId)}`;
-
-    const statusEl = document.createElement("div");
-    statusEl.style.cssText = "position:fixed;bottom:24px;right:24px;padding:12px 18px;background:linear-gradient(135deg,var(--emerald),var(--emerald-dim));color:#061b14;border-radius:12px;font-weight:700;z-index:9999;font-size:0.85rem;box-shadow:0 10px 30px rgba(16,185,129,0.3);";
-    statusEl.textContent = `Downloading ${fileId}...`;
-    document.body.appendChild(statusEl);
+    const toast = showToast(`Downloading ${fileId}…`);
 
     try {
         const res = await fetch(url);
         if (!res.ok) {
             const text = await res.text();
-            throw new Error(`Download failed: ${res.status} — ${text}`);
+            throw new Error(`Download failed: ${res.status} - ${text}`);
         }
         const blob = await res.blob();
         const a = document.createElement("a");
@@ -891,26 +974,28 @@ async function downloadFile(fileId) {
         a.click();
         a.remove();
         URL.revokeObjectURL(a.href);
-        statusEl.textContent = `Downloaded ${fileId} ✓`;
+        setToast(toast, `Saved ${fileId}`);
     } catch (err) {
-        statusEl.textContent = `Error: ${err.message}`;
-        statusEl.style.background = "var(--red)";
-        statusEl.style.color = "#fff";
+        setToast(toast, `Error: ${err.message}`, true);
     }
-    setTimeout(() => statusEl.remove(), 4000);
+    dismissToast(toast);
 }
 
 async function deleteFile(fileId) {
-    if (!confirm(`Permanently delete "${fileId}" from Telegram storage?`)) return;
+    const ok = await confirmDialog({
+        title: "Delete file",
+        message: `“${fileId}” will be removed from Telegram storage. This cannot be undone.`,
+        confirmLabel: "Delete file",
+    });
+    if (!ok) return;
 
     try {
         const res = await fetch(`/api/folders/${currentFolderId}/files/${encodeURIComponent(fileId)}`, {
             method: "DELETE",
         });
         if (!res.ok) {
-            const data = await res.json();
-            alert(data.detail || "Delete failed");
-            return;
+            const data = await res.json().catch(() => ({}));
+            throw new Error(data.detail || "Delete failed");
         }
         if (selectedFile && selectedFile.id === fileId) {
             selectedFile = null;
@@ -918,7 +1003,7 @@ async function deleteFile(fileId) {
         }
         loadFiles();
     } catch (err) {
-        alert("Delete failed: " + err.message);
+        showErrorToast(`Delete failed: ${err.message}`);
     }
 }
 
@@ -937,18 +1022,195 @@ let gallerySlideshowDuration = 4000;
 let activeGalleryModal = null;
 let galleryZoomCleanup = null;
 
+// ── Extension groups (keep in sync with api/routes.py) ──
+const IMAGE_EXTS = ['.jpg', '.jpeg', '.png', '.gif', '.webp', '.avif', '.bmp', '.svg', '.ico'];
+const VIDEO_EXTS = ['.mp4', '.webm', '.mov', '.mkv', '.m4v'];
+const AUDIO_EXTS = ['.mp3', '.wav', '.ogg', '.oga', '.m4a', '.flac', '.aac', '.opus'];
+const TEXT_EXTS = [
+    '.txt', '.text', '.md', '.markdown', '.rst', '.log', '.csv', '.tsv', '.json', '.jsonl',
+    '.xml', '.yaml', '.yml', '.toml', '.ini', '.cfg', '.conf', '.env', '.properties',
+    '.html', '.htm', '.xhtml', '.css', '.scss', '.sass', '.less', '.js', '.mjs', '.cjs',
+    '.jsx', '.ts', '.tsx', '.vue', '.svelte', '.py', '.pyw', '.rb', '.php', '.pl', '.lua',
+    '.r', '.go', '.rs', '.java', '.kt', '.kts', '.swift', '.c', '.h', '.cpp', '.cc', '.cxx',
+    '.hpp', '.cs', '.m', '.mm', '.sql', '.sh', '.bash', '.zsh', '.fish', '.bat', '.cmd',
+    '.ps1', '.dockerfile', '.makefile', '.gitignore', '.editorconfig', '.diff', '.patch',
+    '.tex', '.graphql', '.gql', '.proto', '.tf', '.gradle', '.rake', '.asm', '.v', '.ex',
+    '.exs', '.clj', '.hs', '.scala', '.dart', '.groovy', '.vb', '.pas', '.nim', '.zig'
+];
+
 function isPreviewable(fileId) {
     const ext = getFileExt(fileId);
-    return [
-        // Images
-        '.jpg', '.jpeg', '.png', '.gif', '.webp', '.svg', '.bmp', '.ico',
-        // Videos
-        '.mp4', '.webm', '.mov', '.mkv',
-        // Audio
-        '.mp3', '.wav', '.ogg', '.m4a', '.flac',
-        // Documents / Code
-        '.pdf', '.txt', '.md', '.json', '.xml', '.html', '.css', '.js', '.py', '.cpp', '.sql', '.sh'
-    ].includes(ext);
+    if (!ext) return true; // extension-less files (README, .env …) preview as text
+    return ext === '.pdf'
+        || IMAGE_EXTS.includes(ext)
+        || VIDEO_EXTS.includes(ext)
+        || AUDIO_EXTS.includes(ext)
+        || TEXT_EXTS.includes(ext);
+}
+
+/**
+ * Preview URL for a file. The `v` query carries the content hash so a
+ * re-uploaded file always gets a fresh response instead of a cached preview.
+ */
+function previewSrc(file) {
+    const id = (file && typeof file === 'object') ? file.id : file;
+    const version = (file && typeof file === 'object' && file.hash) ? `?v=${encodeURIComponent(file.hash)}` : '';
+    return `/api/folders/${currentFolderId}/preview/${encodeURIComponent(id)}${version}`;
+}
+
+function isImageExt(ext) { return IMAGE_EXTS.includes(ext); }
+function isVideoExt(ext) { return VIDEO_EXTS.includes(ext); }
+function isAudioExt(ext) { return AUDIO_EXTS.includes(ext); }
+
+// ══════════════════════════════════════════════
+//  Text / code preview (shared by Quick Look and the gallery)
+// ══════════════════════════════════════════════
+function buildTextPreviewShell(label) {
+    return `
+        <div class="preview-text-shell">
+            <div class="preview-text-bar">
+                <span class="preview-text-label">${escapeHtml(label || 'Text preview')}</span>
+                <span class="preview-text-meta" data-text-meta></span>
+                <button class="btn btn-quiet" type="button" data-text-wrap title="Toggle line wrapping">Wrap: on</button>
+                <button class="btn btn-quiet" type="button" data-text-copy title="Copy the whole file">
+                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="9" y="9" width="12" height="12" rx="2"/><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"/></svg>
+                    <span data-text-copy-label>Copy</span>
+                </button>
+            </div>
+            <pre class="preview-code-container" tabindex="0"><code></code></pre>
+        </div>
+    `;
+}
+
+/**
+ * Fetch a text file into a preview shell and wire up wrap / copy controls.
+ * The <pre> owns the scrolling so long files are always reachable.
+ */
+function hydrateTextPreview(scope, url, loaderSelector = null) {
+    const shell = scope.querySelector(".preview-text-shell");
+    const removeLoader = () => { if (loaderSelector) scope.querySelector(loaderSelector)?.remove(); };
+    if (!shell) { removeLoader(); return; }
+
+    const pre = shell.querySelector(".preview-code-container");
+    const code = shell.querySelector("code");
+    const meta = shell.querySelector("[data-text-meta]");
+    const wrapBtn = shell.querySelector("[data-text-wrap]");
+    const copyBtn = shell.querySelector("[data-text-copy]");
+    const copyLabel = shell.querySelector("[data-text-copy-label]");
+
+    if (pre) {
+        // Space scrolls the reader (Shift+Space goes back up). Native PageUp/
+        // PageDown/arrows keep working, and no overlay steals the keys.
+        pre.addEventListener("keydown", (e) => {
+            if (e.key === " " || e.key === "Spacebar") {
+                e.preventDefault();
+                pre.scrollBy({
+                    top: (e.shiftKey ? -1 : 1) * Math.round(pre.clientHeight * 0.9),
+                    behavior: "smooth",
+                });
+            }
+        });
+    }
+
+    if (wrapBtn && pre) {
+        wrapBtn.onclick = () => {
+            const nowWrapped = !pre.classList.toggle("no-wrap");
+            wrapBtn.textContent = nowWrapped ? "Wrap: on" : "Wrap: off";
+        };
+    }
+
+    if (copyBtn) {
+        copyBtn.onclick = async () => {
+            try {
+                await navigator.clipboard.writeText(code ? code.textContent : "");
+                if (copyLabel) copyLabel.textContent = "Copied";
+            } catch (_) {
+                if (copyLabel) copyLabel.textContent = "Copy failed";
+            }
+            setTimeout(() => { if (copyLabel) copyLabel.textContent = "Copy"; }, 1600);
+        };
+    }
+
+    fetch(url)
+        .then(res => {
+            if (!res.ok) throw new Error(`HTTP ${res.status}`);
+            return res.text();
+        })
+        .then(text => {
+            removeLoader();
+            if (code) code.textContent = text;
+            if (meta) {
+                const lines = text.length ? text.split("\n").length : 0;
+                meta.textContent = `${lines} line${lines === 1 ? '' : 's'} · ${formatBytes(new Blob([text]).size)}`;
+            }
+        })
+        .catch(err => {
+            removeLoader();
+            shell.remove();
+            const box = document.createElement("div");
+            box.className = "preview-error-box";
+            box.innerHTML = `
+                <svg class="preview-error-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><circle cx="12" cy="12" r="9"/><path d="M12 8v5M12 16.5h.01"/></svg>
+                <h4>Couldn't load this preview</h4>
+                <p>${escapeHtml(err.message)}</p>
+            `;
+            scope.appendChild(box);
+        });
+}
+
+/** True for keys a focused scroll container should handle natively. */
+function isScrollingKey(e) {
+    return [" ", "Spacebar", "PageUp", "PageDown", "ArrowUp", "ArrowDown", "Home", "End"].includes(e.key)
+        && !e.metaKey && !e.ctrlKey && !e.altKey;
+}
+
+/** Swap a media element that failed to load for a friendly error card. */
+function handlePreviewLoadError(el) {
+    if (!el || !el.parentElement) return;
+    const box = document.createElement("div");
+    box.className = "preview-error-box";
+    box.innerHTML = `
+        <svg class="preview-error-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><circle cx="12" cy="12" r="9"/><path d="M12 8v5M12 16.5h.01"/></svg>
+        <h4>Preview unavailable</h4>
+        <p>This file could not be fetched from Telegram. Try downloading it instead.</p>
+    `;
+    el.replaceWith(box);
+    document.getElementById("gallery-loader")?.remove();
+}
+
+function closePreviewModal(modal) {
+    if (modal && modal.classList.contains("gallery-overlay")) closeGalleryModal();
+    else closeQuickLook();
+}
+
+// ══════════════════════════════════════════════
+//  Toasts
+// ══════════════════════════════════════════════
+function showToast(message) {
+    const toast = document.createElement("div");
+    toast.className = "td-toast";
+    toast.innerHTML = `<span class="td-toast-dot"></span><span class="td-toast-text"></span>`;
+    toast.querySelector(".td-toast-text").textContent = message;
+    document.body.appendChild(toast);
+    return toast;
+}
+
+function setToast(toast, message, isError = false) {
+    if (!toast) return;
+    toast.classList.toggle("error", !!isError);
+    const text = toast.querySelector(".td-toast-text");
+    if (text) text.textContent = message;
+}
+
+function dismissToast(toast, delay = 4200) {
+    if (toast) setTimeout(() => toast.remove(), delay);
+}
+
+function showErrorToast(message) {
+    const toast = showToast(message);
+    setToast(toast, message, true);
+    dismissToast(toast, 5600);
+    return toast;
 }
 
 function toggleGalleryMenu(e) {
@@ -991,7 +1253,7 @@ function startGalleryPreview(limit = 10, startIndex = 0, customFiles = null) {
     let previewableList = pool.filter(f => isPreviewable(f.id));
 
     if (!previewableList.length) {
-        alert("No previewable media files (images, videos, audio, PDF, text) found in this folder.");
+        showErrorToast("Nothing to preview here: no images, media, PDFs or text files in this folder.");
         return;
     }
 
@@ -1010,7 +1272,7 @@ function startGalleryPreview(limit = 10, startIndex = 0, customFiles = null) {
 
 function previewFile(fileId) {
     if (!isPreviewable(fileId)) {
-        alert('This file type cannot be previewed directly. Please download it instead.');
+        showErrorToast('This file type can’t be previewed: download it instead.');
         return;
     }
     const previewableList = (allFiles || []).filter(f => isPreviewable(f.id));
@@ -1030,7 +1292,7 @@ let quickLookModal = null;
 
 function quickLookSelected() {
     if (!selectedFile) {
-        alert('Select a file first, then press Space for Quick Look.');
+        showErrorToast('Select a file first, then press Space for Quick Look.');
         return;
     }
     openQuickLook(selectedFile);
@@ -1038,7 +1300,7 @@ function quickLookSelected() {
 
 function openQuickLook(file) {
     if (!file || !isPreviewable(file.id)) {
-        alert('This file type cannot be previewed directly. Please download it instead.');
+        showErrorToast('This file type can’t be previewed: download it instead.');
         return;
     }
     closeQuickLook();
@@ -1071,7 +1333,7 @@ function openQuickLook(file) {
                 <div class="quick-look-content"></div>
                 <button class="quick-look-nav next" title="Next file (→)" aria-label="Next file">›</button>
             </main>
-            <footer class="quick-look-footer"><span><kbd>Space</kbd> Close</span><span><kbd>←</kbd> <kbd>→</kbd> Navigate</span><span><kbd>Esc</kbd> Close</span></footer>
+            <footer class="quick-look-footer"><span class="ql-hint-space"><kbd>Space</kbd> Close</span><span><kbd>←</kbd> <kbd>→</kbd> Navigate</span><span><kbd>Esc</kbd> Close</span></footer>
         </div>
     `;
     document.body.appendChild(modal);
@@ -1083,7 +1345,7 @@ function openQuickLook(file) {
     const render = () => {
         const current = queue[index] || file;
         const ext = getFileExt(current.id);
-        const url = `/api/folders/${currentFolderId}/preview/${encodeURIComponent(current.id)}`;
+        const url = previewSrc(current);
         const label = current.name || current.id;
         title.textContent = label;
         title.title = label;
@@ -1091,21 +1353,23 @@ function openQuickLook(file) {
         modal.querySelector('.quick-look-nav.prev').disabled = index <= 0;
         modal.querySelector('.quick-look-nav.next').disabled = index >= queue.length - 1;
 
-        if (['.jpg','.jpeg','.png','.gif','.webp','.bmp','.svg','.ico'].includes(ext)) {
-            content.innerHTML = `<img class="quick-look-image" src="${url}" alt="${escapeAttr(label)}" onerror="this.outerHTML='<div class=\'quick-look-error\'>Unable to load this preview.</div>'">`;
-        } else if (['.mp4','.webm','.mov','.mkv'].includes(ext)) {
-            content.innerHTML = `<video class="quick-look-video" src="${url}" controls autoplay></video>`;
-        } else if (['.mp3','.wav','.ogg','.m4a','.flac'].includes(ext)) {
-            content.innerHTML = `<div class="quick-look-audio-wrap"><div class="quick-look-audio-icon">${getFileIconSvg(ext)}</div><audio class="quick-look-audio" src="${url}" controls autoplay></audio></div>`;
+        const hintSpace = modal.querySelector('.ql-hint-space');
+        if (hintSpace) {
+            const reading = !isImageExt(ext) && !isVideoExt(ext) && !isAudioExt(ext) && ext !== '.pdf';
+            hintSpace.innerHTML = reading ? '<kbd>Space</kbd> Scroll' : '<kbd>Space</kbd> Close';
+        }
+
+        if (isImageExt(ext)) {
+            content.innerHTML = `<img class="quick-look-image" src="${url}" alt="${escapeAttr(label)}" onerror="handlePreviewLoadError(this)">`;
+        } else if (isVideoExt(ext)) {
+            content.innerHTML = `<video class="quick-look-video" src="${url}" controls autoplay onerror="handlePreviewLoadError(this)"></video>`;
+        } else if (isAudioExt(ext)) {
+            content.innerHTML = `<div class="quick-look-audio-wrap"><div class="quick-look-audio-icon">${getFileIconSvg(ext)}</div><audio class="quick-look-audio" src="${url}" controls autoplay onerror="handlePreviewLoadError(this)"></audio></div>`;
         } else if (ext === '.pdf') {
             content.innerHTML = `<iframe class="quick-look-pdf" src="${url}" title="${escapeAttr(label)}"></iframe>`;
         } else {
-            content.innerHTML = `<div class="quick-look-text-wrap"><div class="quick-look-text-label">Text Preview</div><pre class="quick-look-text"><code></code></pre></div>`;
-            fetch(url).then(async response => {
-                if (!response.ok) throw new Error(`HTTP ${response.status}`);
-                return response.text();
-            }).then(text => { const code = content.querySelector('code'); if (code) code.textContent = text; })
-              .catch(() => { const code = content.querySelector('code'); if (code) code.textContent = 'Unable to load this preview.'; });
+            content.innerHTML = buildTextPreviewShell('Text preview');
+            hydrateTextPreview(content, url);
         }
     };
 
@@ -1115,6 +1379,11 @@ function openQuickLook(file) {
     modal.querySelector('.quick-look-nav.next').onclick = () => { if (index < queue.length - 1) { index += 1; render(); } };
     modal.addEventListener('click', e => { if (e.target === modal) closeQuickLook(); });
     modal._keyHandler = e => {
+        // A focused text preview owns the scroll keys — don't close/navigate under it.
+        if (e.target && e.target.closest && e.target.closest('.preview-code-container')) {
+            if (e.key === 'Escape') { e.preventDefault(); closeQuickLook(); }
+            return;
+        }
         if (e.key === 'Escape' || e.key === ' ') { e.preventDefault(); closeQuickLook(); }
         else if (e.key === 'ArrowLeft' && index > 0) { index -= 1; render(); }
         else if (e.key === 'ArrowRight' && index < queue.length - 1) { index += 1; render(); }
@@ -1132,7 +1401,8 @@ function closeQuickLook() {
 }
 
 document.addEventListener('keydown', e => {
-    if (quickLookModal || e.defaultPrevented || e.metaKey || e.ctrlKey || e.altKey) return;
+    if (quickLookModal || activeGalleryModal || e.defaultPrevented || e.metaKey || e.ctrlKey || e.altKey) return;
+    if (isScrollingKey(e)) return;
     if (e.key === ' ' && selectedFile) {
         e.preventDefault();
         openQuickLook(selectedFile);
@@ -1200,7 +1470,7 @@ function openGalleryModal() {
             <!-- Right Actions -->
             <div class="gallery-header-right">
                 <button class="btn-action download" id="gallery-download-btn" onclick="downloadCurrentGalleryFile()">Download</button>
-                <button class="btn-icon" onclick="closeGalleryModal()" title="Close (Esc)">✕</button>
+                <button class="icon-btn icon-btn-sm" onclick="closeGalleryModal()" title="Close (Esc)" aria-label="Close gallery">✕</button>
             </div>
         </header>
 
@@ -1245,11 +1515,16 @@ function openGalleryModal() {
 
     // Keyboard navigation listener
     const onKeyDown = (e) => {
+        // While a text preview is focused, let it scroll and leave its keys alone.
+        if (e.target && e.target.closest && e.target.closest('.preview-code-container')) {
+            if (e.key === 'Escape') closeGalleryModal();
+            return;
+        }
         if (e.key === 'Escape') {
             closeGalleryModal();
-        } else if (e.key === 'ArrowLeft' || e.key === 'PageUp') {
+        } else if (e.key === 'ArrowLeft') {
             galleryNav(-1);
-        } else if (e.key === 'ArrowRight' || e.key === 'PageDown') {
+        } else if (e.key === 'ArrowRight') {
             galleryNav(1);
         } else if (e.key === ' ' || e.code === 'Space') {
             e.preventDefault();
@@ -1294,14 +1569,19 @@ function renderGalleryContent() {
     if (prevBtn) prevBtn.disabled = (galleryIndex === 0 && !gallerySlideshowActive);
     if (nextBtn) nextBtn.disabled = (galleryIndex === total - 1 && !gallerySlideshowActive);
 
-    // 3. Update Side-by-side Button Active State
+    // 3. Side-by-side only makes sense for image comparisons
+    const canCompare = isImageExt(getFileExt(currentFile.id)) && total > 1;
+    if (gallerySideBySide && !canCompare) gallerySideBySide = false;
     const sideBtn = activeGalleryModal.querySelector('#gallery-side-btn');
-    if (sideBtn) sideBtn.classList.toggle('active', gallerySideBySide);
+    if (sideBtn) {
+        sideBtn.classList.toggle('active', gallerySideBySide);
+        sideBtn.style.display = canCompare ? '' : 'none';
+    }
 
     // 4. Render Stage Media
     const viewport = activeGalleryModal.querySelector('#gallery-viewport');
     if (viewport) {
-        if (gallerySideBySide && total > 1) {
+        if (gallerySideBySide) {
             renderGallerySideBySide(viewport);
         } else {
             renderGallerySingle(viewport, currentFile);
@@ -1319,24 +1599,26 @@ function renderGallerySingle(viewport, file) {
     }
 
     const ext = getFileExt(file.id);
-    const isImage = ['.jpg', '.jpeg', '.png', '.gif', '.webp', '.bmp', '.ico', '.svg'].includes(ext);
-    const previewUrl = `/api/folders/${currentFolderId}/preview/${encodeURIComponent(file.id)}`;
+    const isImage = isImageExt(ext);
+    const previewUrl = previewSrc(file);
+    const isReaderFile = !isImage && !isVideoExt(ext) && !isAudioExt(ext) && ext !== '.pdf';
 
-    // Show/hide image zoom toolbar
+    // Show/hide image zoom toolbar, and drop the overlay hints while reading text
     const zoomTools = activeGalleryModal.querySelector('#gallery-zoom-tools');
     if (zoomTools) zoomTools.style.display = isImage ? 'inline-flex' : 'none';
+    activeGalleryModal.classList.toggle('is-reading', isReaderFile);
 
     if (isImage) {
         viewport.innerHTML = `
             <div class="preview-spinner-overlay" id="gallery-loader">
                 <div class="preview-spinner"></div>
-                <p style="margin-top:14px;font-size:0.85rem;color:var(--text-2);">Retrieving image from Telegram...</p>
+                <p>Retrieving image from Telegram…</p>
             </div>
             <div class="gallery-image-viewport" id="gallery-image-viewport">
                 <div class="gallery-image-wrapper" id="gallery-image-wrapper">
                     <img src="${previewUrl}" alt="${escapeAttr(file.id)}"
                         onload="document.getElementById('gallery-loader')?.remove()"
-                        onerror="handlePreviewLoadError(this, '${escapeAttr(file.id)}')">
+                        onerror="handlePreviewLoadError(this)">
                 </div>
             </div>
         `;
@@ -1361,32 +1643,32 @@ function renderGallerySingle(viewport, file) {
             btnRotate: btnRotate
         });
 
-    } else if (['.mp4', '.webm', '.mov', '.mkv'].includes(ext)) {
+    } else if (isVideoExt(ext)) {
         viewport.innerHTML = `
             <div class="preview-spinner-overlay" id="gallery-loader">
                 <div class="preview-spinner"></div>
-                <p style="margin-top:14px;font-size:0.85rem;color:var(--text-2);">Streaming video from Telegram...</p>
+                <p>Streaming video from Telegram…</p>
             </div>
             <div class="preview-media-container">
-                <video controls autoplay playsinline style="max-width:100%;max-height:100%;border-radius:12px;box-shadow:0 24px 70px rgba(0,0,0,0.85);"
+                <video controls autoplay playsinline
                     onloadeddata="document.getElementById('gallery-loader')?.remove()"
-                    onerror="handlePreviewLoadError(this, '${escapeAttr(file.id)}')">
+                    onerror="handlePreviewLoadError(this)">
                     <source src="${previewUrl}">
                 </video>
             </div>
         `;
-    } else if (['.mp3', '.wav', '.ogg', '.m4a', '.flac'].includes(ext)) {
+    } else if (isAudioExt(ext)) {
         viewport.innerHTML = `
             <div class="preview-spinner-overlay" id="gallery-loader">
                 <div class="preview-spinner"></div>
-                <p style="margin-top:14px;font-size:0.85rem;color:var(--text-2);">Streaming audio from Telegram...</p>
+                <p>Streaming audio from Telegram…</p>
             </div>
-            <div class="preview-media-container" style="flex-direction:column;gap:20px;">
-                <div style="font-size:3rem;">🎵</div>
-                <h3 style="font-size:1.1rem;color:var(--text-1);">${escapeHtml(file.id)}</h3>
-                <audio controls autoplay style="width:100%;max-width:540px;"
+            <div class="preview-media-container preview-audio-stage">
+                <div class="preview-audio-icon">${getFileIconSvg(ext)}</div>
+                <h3 class="preview-audio-title">${escapeHtml(file.id)}</h3>
+                <audio controls autoplay
                     oncanplay="document.getElementById('gallery-loader')?.remove()"
-                    onerror="handlePreviewLoadError(this, '${escapeAttr(file.id)}')">
+                    onerror="handlePreviewLoadError(this)">
                     <source src="${previewUrl}">
                 </audio>
             </div>
@@ -1395,42 +1677,21 @@ function renderGallerySingle(viewport, file) {
         viewport.innerHTML = `
             <div class="preview-spinner-overlay" id="gallery-loader">
                 <div class="preview-spinner"></div>
-                <p style="margin-top:14px;font-size:0.85rem;color:var(--text-2);">Retrieving PDF from Telegram...</p>
+                <p>Retrieving PDF from Telegram…</p>
             </div>
-            <iframe class="preview-pdf-iframe" src="${previewUrl}" style="width:100%;height:100%;border-radius:12px;border:none;"
-                onload="document.getElementById('gallery-loader')?.remove()"
-                onerror="handlePreviewLoadError(this, '${escapeAttr(file.id)}')"></iframe>
+            <iframe class="preview-pdf-iframe" src="${previewUrl}" title="${escapeAttr(file.id)}"
+                onload="document.getElementById('gallery-loader')?.remove()"></iframe>
         `;
     } else {
+        // Text / code / config files: a scrollable reader with wrap + copy.
         viewport.innerHTML = `
             <div class="preview-spinner-overlay" id="gallery-loader">
                 <div class="preview-spinner"></div>
-                <p style="margin-top:14px;font-size:0.85rem;color:var(--text-2);">Retrieving code/text from Telegram...</p>
+                <p>Retrieving text from Telegram…</p>
             </div>
-            <pre class="preview-code-container" style="width:100%;height:100%;max-height:80vh;"><code id="gallery-text-content"></code></pre>
+            ${buildTextPreviewShell(file.id)}
         `;
-        fetch(previewUrl)
-            .then(async r => {
-                document.getElementById('gallery-loader')?.remove();
-                if (!r.ok) throw new Error(`HTTP ${r.status}`);
-                return r.text();
-            })
-            .then(txt => {
-                const el = document.getElementById('gallery-text-content');
-                if (el) el.textContent = txt;
-            })
-            .catch(err => {
-                document.getElementById('gallery-loader')?.remove();
-                viewport.innerHTML = `
-                    <div class="preview-error-box">
-                        <svg class="preview-error-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                            <circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="12"/><line x1="12" y1="16" x2="12.01" y2="16"/>
-                        </svg>
-                        <h4 style="margin-bottom:8px;">Failed to Load Preview</h4>
-                        <p style="font-size:0.85rem;color:var(--text-2);">${escapeHtml(err.message)}</p>
-                    </div>
-                `;
-            });
+        hydrateTextPreview(viewport, previewUrl, '#gallery-loader');
     }
 }
 
@@ -1444,8 +1705,8 @@ function renderGallerySideBySide(viewport) {
     const nextIdx = (galleryIndex + 1) % galleryQueue.length;
     const fileB = galleryQueue[nextIdx];
 
-    const urlA = `/api/folders/${currentFolderId}/preview/${encodeURIComponent(fileA.id)}`;
-    const urlB = `/api/folders/${currentFolderId}/preview/${encodeURIComponent(fileB.id)}`;
+    const urlA = previewSrc(fileA);
+    const urlB = previewSrc(fileB);
 
     viewport.innerHTML = `
         <div class="gallery-split-view">
@@ -1484,19 +1745,17 @@ function renderGalleryFilmstrip() {
 
     track.innerHTML = galleryQueue.map((file, i) => {
         const ext = getFileExt(file.id);
-        const isImg = ['.jpg', '.jpeg', '.png', '.gif', '.webp', '.bmp', '.svg', '.ico'].includes(ext);
-        const previewUrl = `/api/folders/${currentFolderId}/preview/${encodeURIComponent(file.id)}`;
+        const isImg = isImageExt(ext);
+        const previewUrl = previewSrc(file);
         const isActive = i === galleryIndex ? 'active' : '';
 
         return `
             <div class="gallery-thumb-card ${isActive}" id="filmstrip-thumb-${i}" onclick="jumpToGalleryIndex(${i})" title="${escapeAttr(file.id)} (${formatBytes(file.size || 0)})">
-                ${isImg 
-                    ? `<img class="gallery-thumb-img" src="${previewUrl}" loading="lazy" alt="${escapeAttr(file.id)}" onerror="this.parentElement.innerHTML='<div class=\\'gallery-thumb-icon\\'>${escapeAttr(ext)}</div>'">` 
-                    : `<div class="gallery-thumb-icon">
-                        ${getFileIconSvg(ext)}
-                        <span>${escapeHtml(ext.replace('.', ''))}</span>
-                       </div>`
-                }
+                <div class="gallery-thumb-icon">
+                    ${getFileIconSvg(ext)}
+                    <span>${escapeHtml(ext.replace('.', '') || 'file')}</span>
+                </div>
+                ${isImg ? `<img class="gallery-thumb-img" src="${previewUrl}" loading="lazy" alt="${escapeAttr(file.id)}" onerror="this.remove()">` : ''}
                 <span class="gallery-thumb-badge">${i + 1}</span>
             </div>
         `;
@@ -1534,6 +1793,13 @@ function galleryNav(delta) {
 }
 
 function toggleGallerySideBySide() {
+    const ext = getFileExt((galleryQueue[galleryIndex] || {}).id || '');
+    if (!isImageExt(ext)) {
+        gallerySideBySide = false;
+        showErrorToast('Side-by-side comparison works with images only.');
+        renderGalleryContent();
+        return;
+    }
     gallerySideBySide = !gallerySideBySide;
     renderGalleryContent();
 }
@@ -1769,15 +2035,15 @@ async function rebuildIndex() {
         if (!res.ok) throw new Error(data.error || "Sync failed");
 
         if (data.summary && data.summary.bot_mode) {
-            alert("Bot mode active: Channel history scan is unavailable for Telegram bot accounts. All uploaded files are indexed directly in PostgreSQL.");
+            dismissToast(showToast("Bot mode: channel history can’t be scanned. New uploads are indexed directly."), 7000);
         } else if (data.summary) {
-            alert(`Vault Rebuilt: ${data.summary.files} files, ${data.summary.folders} folders indexed.`);
+            dismissToast(showToast(`Vault rebuilt: ${data.summary.files} files, ${data.summary.folders} folders indexed.`), 6000);
         } else {
-            alert(data.message || "Sync completed.");
+            dismissToast(showToast(data.message || "Sync completed."), 6000);
         }
         loadFolders();
     } catch (err) {
-        alert("Rebuild failed: " + err.message);
+        showErrorToast(`Sync failed: ${err.message}`);
     } finally {
         if (btn) {
             btn.innerHTML = originalText;
@@ -1835,6 +2101,20 @@ function escapeAttr(text) {
         .replace(/&/g, "&amp;")
         .replace(/"/g, "&quot;")
         .replace(/'/g, "&#39;")
+        .replace(/</g, "&lt;")
+        .replace(/>/g, "&gt;");
+}
+
+/**
+ * A real JS string literal that survives an HTML attribute round-trip.
+ * Used inside inline handlers so names containing quotes or `'` can't break
+ * the generated markup (JSON.stringify handles escaping, then we HTML-escape
+ * the quoting characters).
+ */
+function jsStr(value) {
+    return JSON.stringify(String(value))
+        .replace(/&/g, "&amp;")
+        .replace(/"/g, "&quot;")
         .replace(/</g, "&lt;")
         .replace(/>/g, "&gt;");
 }

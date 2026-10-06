@@ -149,6 +149,9 @@ def list_files(folder_id: int, request: Request):
             "size": f.size,
             "folder": f.folder,
             "chunks": f.chunks,
+            # Content hash → used by the UI to cache-bust previews after a
+            # file is re-uploaded with the same name.
+            "hash": f.hash,
         }
         for f in files
     ]
@@ -221,64 +224,70 @@ async def download_file(
         raise HTTPException(status_code=500, detail=f"Download failed: {exc}")
 
 
+# ──────────────────────────────────────────────────────────────
+#  Preview support
+#  Extension groups are mirrored in frontend/app.js — keep them in sync.
+# ──────────────────────────────────────────────────────────────
+IMAGE_TYPES = {
+    ".jpg": "image/jpeg", ".jpeg": "image/jpeg", ".png": "image/png",
+    ".gif": "image/gif", ".webp": "image/webp", ".avif": "image/avif",
+    ".bmp": "image/bmp", ".svg": "image/svg+xml", ".ico": "image/x-icon",
+}
+VIDEO_TYPES = {
+    ".mp4": "video/mp4", ".webm": "video/webm", ".mov": "video/quicktime",
+    ".mkv": "video/x-matroska", ".m4v": "video/x-m4v",
+}
+AUDIO_TYPES = {
+    ".mp3": "audio/mpeg", ".wav": "audio/wav", ".ogg": "audio/ogg",
+    ".oga": "audio/ogg", ".m4a": "audio/mp4", ".flac": "audio/flac",
+    ".aac": "audio/aac", ".opus": "audio/opus",
+}
+PDF_TYPES = {".pdf": "application/pdf"}
+
+# Plain-text/code files. Anything listed here (or a file with no extension at
+# all) is stored as text/plain rather than its "real" MIME type, so a previewed
+# upload can never be re-interpreted as HTML/JS in the app's origin.
+TEXT_EXTENSIONS = {
+    ".txt", ".text", ".md", ".markdown", ".rst", ".log", ".csv", ".tsv",
+    ".json", ".jsonl", ".xml", ".yaml", ".yml", ".toml", ".ini", ".cfg",
+    ".conf", ".env", ".properties", ".html", ".htm", ".xhtml", ".css",
+    ".scss", ".sass", ".less", ".js", ".mjs", ".cjs", ".jsx", ".ts",
+    ".tsx", ".vue", ".svelte", ".py", ".pyw", ".rb", ".php", ".pl",
+    ".lua", ".r", ".go", ".rs", ".java", ".kt", ".kts", ".swift", ".c",
+    ".h", ".cpp", ".cc", ".cxx", ".hpp", ".cs", ".m", ".mm", ".sql",
+    ".sh", ".bash", ".zsh", ".fish", ".bat", ".cmd", ".ps1", ".dockerfile",
+    ".makefile", ".gitignore", ".editorconfig", ".diff", ".patch", ".tex",
+    ".graphql", ".gql", ".proto", ".tf", ".gradle", ".rake", ".asm", ".v",
+    ".ex", ".exs", ".clj", ".hs", ".scala", ".dart", ".groovy", ".vb",
+    ".pas", ".nim", ".zig",
+}
+
+PREVIEWABLE_EXTENSIONS = (
+    set(IMAGE_TYPES) | set(VIDEO_TYPES) | set(AUDIO_TYPES)
+    | set(PDF_TYPES) | TEXT_EXTENSIONS
+)
+
+
 def _get_media_type(filename: str) -> str:
-    """Determine media type from file extension."""
+    """Resolve the media type used when streaming a preview."""
     ext = Path(filename).suffix.lower()
-    media_types = {
-        # Images
-        ".jpg": "image/jpeg",
-        ".jpeg": "image/jpeg",
-        ".png": "image/png",
-        ".gif": "image/gif",
-        ".webp": "image/webp",
-        ".svg": "image/svg+xml",
-        ".bmp": "image/bmp",
-        ".ico": "image/x-icon",
-        # Videos
-        ".mp4": "video/mp4",
-        ".webm": "video/webm",
-        ".mov": "video/quicktime",
-        ".avi": "video/x-msvideo",
-        ".mkv": "video/x-matroska",
-        # Audio
-        ".mp3": "audio/mpeg",
-        ".wav": "audio/wav",
-        ".ogg": "audio/ogg",
-        ".m4a": "audio/mp4",
-        ".flac": "audio/flac",
-        # Documents
-        ".pdf": "application/pdf",
-        ".txt": "text/plain",
-        ".md": "text/markdown",
-        ".json": "application/json",
-        ".xml": "application/xml",
-        ".html": "text/html",
-        ".css": "text/css",
-        ".js": "application/javascript",
-        # Archives
-        ".zip": "application/zip",
-        ".tar": "application/x-tar",
-        ".gz": "application/gzip",
-        ".rar": "application/vnd.rar",
-        ".7z": "application/x-7z-compressed",
-    }
-    return media_types.get(ext, "application/octet-stream")
+    if ext in IMAGE_TYPES:
+        return IMAGE_TYPES[ext]
+    if ext in VIDEO_TYPES:
+        return VIDEO_TYPES[ext]
+    if ext in AUDIO_TYPES:
+        return AUDIO_TYPES[ext]
+    if ext in PDF_TYPES:
+        return PDF_TYPES[ext]
+    if ext in TEXT_EXTENSIONS or ext == "":
+        return "text/plain; charset=utf-8"
+    return "application/octet-stream"
 
 
 def _is_previewable(filename: str) -> bool:
-    """Check if file type supports inline preview."""
+    """Check if a file type supports inline preview."""
     ext = Path(filename).suffix.lower()
-    previewable = {
-        # Images
-        ".jpg", ".jpeg", ".png", ".gif", ".webp", ".svg", ".bmp", ".ico",
-        # Videos
-        ".mp4", ".webm", ".mov", ".mkv",
-        # Audio
-        ".mp3", ".wav", ".ogg", ".m4a", ".flac",
-        # Documents
-        ".pdf", ".txt", ".md", ".json", ".xml", ".html", ".css", ".js",
-    }
-    return ext in previewable
+    return ext == "" or ext in PREVIEWABLE_EXTENSIONS
 
 
 @router.get("/folders/{folder_id:int}/preview/{file_id:path}")
@@ -330,7 +339,10 @@ async def preview_file(
             filename=safe_base,
             content_disposition_type="inline",
             headers={
-                "Cache-Control": "public, max-age=3600",
+                # Text-ish previews are served as text/plain; nosniff stops a
+                # crafted upload from being sniffed back into executable HTML/JS.
+                "X-Content-Type-Options": "nosniff",
+                "Cache-Control": "private, max-age=3600",
                 "Accept-Ranges": "bytes",
             },
         )
