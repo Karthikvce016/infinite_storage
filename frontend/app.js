@@ -895,11 +895,33 @@ async function handleFiles(files) {
     }
 }
 
+// Active upload XHR and upload ID — stored globally so the cancel button can abort it
+let currentUploadXHR = null;
+let currentUploadId = null;
+
+function cancelUpload() {
+    if (currentUploadId) {
+        fetch(`/api/upload/cancel/${currentUploadId}`, { method: "POST" }).catch(() => {});
+    }
+    if (currentUploadXHR) {
+        currentUploadXHR.abort();
+        currentUploadXHR = null;
+    }
+}
+
 async function uploadFile(file) {
     progressCont.classList.remove("hidden");
-    uploadFilename.textContent = `Uploading ${file.name}...`;
+    uploadFilename.textContent = `Preparing ${file.name}…`;
     uploadPercent.textContent = "0%";
     progressFill.style.width = "0%";
+    progressFill.style.background = "";
+
+    // Show cancel button
+    const cancelBtn = document.getElementById("upload-cancel-btn");
+    if (cancelBtn) cancelBtn.classList.remove("hidden");
+
+    const uploadId = "up_" + Math.random().toString(36).substring(2, 10) + "_" + Date.now().toString(36);
+    currentUploadId = uploadId;
 
     const formData = new FormData();
     formData.append("file", file);
@@ -907,16 +929,83 @@ async function uploadFile(file) {
     try {
         await new Promise((resolve, reject) => {
             const xhr = new XMLHttpRequest();
+            currentUploadXHR = xhr;
+            let ndjsonOffset = 0;       // how far we've parsed in responseText
+            let serverPhaseBegan = false;
 
+            let lastBytes = 0;
+            let lastTime = Date.now();
+            let currentSpeed = "";
+
+            // ── Phase 1: Browser → Server ──
             xhr.upload.addEventListener("progress", (e) => {
-                if (e.lengthComputable) {
-                    const pct = Math.round((e.loaded / e.total) * 100);
-                    progressFill.style.width = pct + "%";
-                    uploadPercent.textContent = pct + "%";
+                if (e.lengthComputable && !serverPhaseBegan) {
+                    uploadFilename.textContent = `Sending to server (${formatBytes(e.loaded)} / ${formatBytes(e.total)})…`;
+                    uploadPercent.textContent = "0%";
+                    progressFill.style.width = "0%";
                 }
             });
 
+            // ── Phase 2: Server processing & Telegram upload (0% – 100%) ──
+            xhr.onprogress = () => {
+                const text = xhr.responseText;
+                if (!text || text.length <= ndjsonOffset) return;
+
+                const newData = text.substring(ndjsonOffset);
+                ndjsonOffset = text.length;
+
+                const lines = newData.split("\n");
+                for (const line of lines) {
+                    if (!line.trim()) continue;
+                    let ev;
+                    try { ev = JSON.parse(line); } catch (_) { continue; }
+                    serverPhaseBegan = true;
+
+                    if (ev.stage === "hashing") {
+                        progressFill.style.width = "0%";
+                        uploadPercent.textContent = "0%";
+                        uploadFilename.textContent = `Verifying hash…`;
+                    } else if (ev.stage === "splitting") {
+                        progressFill.style.width = "0%";
+                        uploadPercent.textContent = "0%";
+                        uploadFilename.textContent = `Preparing chunks…`;
+                    } else if (ev.stage === "uploading") {
+                        const pct = Math.max(0, Math.min(99, ev.progress ?? 0));
+                        progressFill.style.width = pct + "%";
+                        uploadPercent.textContent = pct + "%";
+                        if (ev.bytes_uploaded != null && ev.total_bytes != null) {
+                            const now = Date.now();
+                            const dt = (now - lastTime) / 1000;
+                            if (dt >= 0.5) {
+                                const db = ev.bytes_uploaded - lastBytes;
+                                if (db > 0) {
+                                    currentSpeed = " • " + formatBytes(Math.round(db / dt)) + "/s";
+                                }
+                                lastBytes = ev.bytes_uploaded;
+                                lastTime = now;
+                            }
+                            const partInfo = ev.total_chunks > 1 ? `part ${ev.chunk}/${ev.total_chunks} • ` : "";
+                            uploadFilename.textContent = `Uploading to Telegram (${partInfo}${formatBytes(ev.bytes_uploaded)} / ${formatBytes(ev.total_bytes)}${currentSpeed})…`;
+                        } else {
+                            uploadFilename.textContent = `Uploading ${file.name} to Telegram…`;
+                        }
+                    } else if (ev.stage === "replacing") {
+                        uploadFilename.textContent = `Updating file record…`;
+                    } else if (ev.stage === "done") {
+                        progressFill.style.width = "100%";
+                        uploadPercent.textContent = "100%";
+                        uploadFilename.textContent = `Uploaded ${file.name} ✓`;
+                    } else if (ev.stage === "error") {
+                        reject(new Error(ev.detail || "Upload failed"));
+                        return;
+                    }
+                }
+            };
+
             xhr.addEventListener("load", () => {
+                currentUploadXHR = null;
+                currentUploadId = null;
+                xhr.onprogress();
                 if (xhr.status >= 200 && xhr.status < 300) {
                     progressFill.style.width = "100%";
                     uploadPercent.textContent = "100%";
@@ -932,10 +1021,25 @@ async function uploadFile(file) {
                 }
             });
 
-            xhr.addEventListener("error", () => reject(new Error("Network error")));
+            xhr.addEventListener("error", () => {
+                currentUploadXHR = null;
+                currentUploadId = null;
+                reject(new Error("Network error"));
+            });
+
+            xhr.addEventListener("abort", () => {
+                currentUploadXHR = null;
+                currentUploadId = null;
+                reject(new Error("Upload cancelled"));
+            });
+
             xhr.open("POST", `/api/folders/${currentFolderId}/upload`);
+            xhr.setRequestHeader("X-Upload-ID", uploadId);
             xhr.send(formData);
         });
+
+        // Hide cancel button
+        if (cancelBtn) cancelBtn.classList.add("hidden");
 
         setTimeout(() => {
             progressCont.classList.add("hidden");
@@ -944,13 +1048,35 @@ async function uploadFile(file) {
 
         loadFiles();
     } catch (err) {
-        uploadFilename.textContent = `Error: ${err.message}`;
-        progressFill.style.background = "var(--danger)";
+        currentUploadXHR = null;
+        currentUploadId = null;
+        const cancelBtn = document.getElementById("upload-cancel-btn");
+        if (cancelBtn) cancelBtn.classList.add("hidden");
+
+        if (err.message === "Upload cancelled") {
+            uploadFilename.textContent = `Cancelled: ${file.name}`;
+            uploadPercent.textContent = "—";
+            progressFill.style.background = "var(--txt-3, #888)";
+        } else {
+            uploadFilename.textContent = `Error: ${err.message}`;
+            progressFill.style.background = "var(--danger)";
+        }
         setTimeout(() => {
             progressCont.classList.add("hidden");
             progressFill.style.background = "";
-        }, 4000);
+            progressFill.style.width = "0%";
+            uploadPercent.textContent = "0%";
+        }, 3000);
     }
+}
+
+/** Format bytes into a human-readable string */
+function formatBytes(bytes) {
+    if (bytes === 0) return "0 B";
+    const k = 1024;
+    const sizes = ["B", "KB", "MB", "GB"];
+    const i = Math.floor(Math.log(bytes) / Math.log(k));
+    return parseFloat((bytes / Math.pow(k, i)).toFixed(1)) + " " + sizes[i];
 }
 
 // ══════════════════════════════════════════════
@@ -1362,9 +1488,9 @@ function openQuickLook(file) {
         if (isImageExt(ext)) {
             content.innerHTML = `<img class="quick-look-image" src="${url}" alt="${escapeAttr(label)}" onerror="handlePreviewLoadError(this)">`;
         } else if (isVideoExt(ext)) {
-            content.innerHTML = `<video class="quick-look-video" src="${url}" controls autoplay onerror="handlePreviewLoadError(this)"></video>`;
+            content.innerHTML = `<video class="quick-look-video" src="${url}" controls autoplay preload="auto" onerror="handlePreviewLoadError(this)"></video>`;
         } else if (isAudioExt(ext)) {
-            content.innerHTML = `<div class="quick-look-audio-wrap"><div class="quick-look-audio-icon">${getFileIconSvg(ext)}</div><audio class="quick-look-audio" src="${url}" controls autoplay onerror="handlePreviewLoadError(this)"></audio></div>`;
+            content.innerHTML = `<div class="quick-look-audio-wrap"><div class="quick-look-audio-icon">${getFileIconSvg(ext)}</div><audio class="quick-look-audio" src="${url}" controls autoplay preload="auto" onerror="handlePreviewLoadError(this)"></audio></div>`;
         } else if (ext === '.pdf') {
             content.innerHTML = `<iframe class="quick-look-pdf" src="${url}" title="${escapeAttr(label)}"></iframe>`;
         } else {
@@ -1650,10 +1776,12 @@ function renderGallerySingle(viewport, file) {
                 <p>Streaming video from Telegram…</p>
             </div>
             <div class="preview-media-container">
-                <video controls autoplay playsinline
+                <video controls autoplay playsinline preload="auto"
+                    src="${previewUrl}"
+                    onloadedmetadata="document.getElementById('gallery-loader')?.remove()"
                     onloadeddata="document.getElementById('gallery-loader')?.remove()"
+                    oncanplay="document.getElementById('gallery-loader')?.remove()"
                     onerror="handlePreviewLoadError(this)">
-                    <source src="${previewUrl}">
                 </video>
             </div>
         `;
@@ -1666,10 +1794,11 @@ function renderGallerySingle(viewport, file) {
             <div class="preview-media-container preview-audio-stage">
                 <div class="preview-audio-icon">${getFileIconSvg(ext)}</div>
                 <h3 class="preview-audio-title">${escapeHtml(file.id)}</h3>
-                <audio controls autoplay
+                <audio controls autoplay preload="auto"
+                    src="${previewUrl}"
+                    onloadedmetadata="document.getElementById('gallery-loader')?.remove()"
                     oncanplay="document.getElementById('gallery-loader')?.remove()"
                     onerror="handlePreviewLoadError(this)">
-                    <source src="${previewUrl}">
                 </audio>
             </div>
         `;

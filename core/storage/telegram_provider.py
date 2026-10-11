@@ -13,9 +13,10 @@ Key design decisions:
     - Graceful error handling for AccessTokenInvalidError, FloodWaitError
 """
 
+import asyncio
 import logging
 from pathlib import Path
-from typing import List, Optional
+from typing import AsyncIterator, List, Optional
 
 from telethon import TelegramClient
 from telethon.errors import (
@@ -273,6 +274,72 @@ class TelegramProvider(StorageProvider):
             dest_dir=dest_dir,
         )
 
+    async def stream_file(
+        self,
+        folder_name: str,
+        msg_ids: List[int],
+        start: int = 0,
+        end: Optional[int] = None,
+        filename: str = "",
+        file_hash: str = "",
+        file_size: Optional[int] = None,
+    ) -> AsyncIterator[bytes]:
+        """Stream a byte range [start, end] using a sparse-file cache.
+
+        Uses FileStreamBuffer for cached, random-access streaming.
+        The buffer prefetches the tail (moov atom for MP4/MOV) and head,
+        then serves any Range request from the local sparse cache file.
+        This allows the browser to make concurrent Range requests for
+        video/audio tracks without each one starting a new Telegram download.
+        """
+        from core.stream_buffer import stream_buffer_manager
+
+        assert self.client is not None
+        if not msg_ids:
+            return
+
+        # Use a unique key for the buffer (prefer file_hash, fall back to msg_ids)
+        buf_hash = file_hash or f"msgs_{'_'.join(str(m) for m in msg_ids)}"
+        buf_name = filename or f"file_{msg_ids[0]}"
+
+        # Check if buffer already exists (avoids Telegram API calls for cached files)
+        buf = stream_buffer_manager.get_existing_buffer(buf_hash, buf_name)
+
+        if buf is None:
+            # Need to create a new buffer — fetch message objects from Telegram
+            entity = await self._resolve_storage_entity()
+            msgs = await self.client.get_messages(entity, ids=msg_ids)
+            valid_msgs = [m for m in (msgs if isinstance(msgs, list) else [msgs]) if m and m.media]
+            if not valid_msgs:
+                raise FileNotFoundError("No valid media messages found")
+
+            if file_size is None or file_size == 0:
+                file_size = sum(m.file.size for m in valid_msgs)
+
+            buf = await stream_buffer_manager.get_buffer(
+                client=self.client,
+                entity=entity,
+                msg_or_msgs=valid_msgs if len(valid_msgs) > 1 else valid_msgs[0],
+                file_hash=buf_hash,
+                filename=buf_name,
+                file_size=file_size,
+            )
+        else:
+            if file_size is None or file_size == 0:
+                file_size = buf.file_size
+
+        if end is None or end >= file_size:
+            end = file_size - 1
+        if start > end or start >= file_size:
+            return
+
+        # Stream the requested range from the buffer (chunks are fetched on-demand)
+        try:
+            async for data in buf.stream_range(start, end):
+                yield data
+        except (asyncio.CancelledError, GeneratorExit):
+            return
+
     async def delete_file(
         self,
         folder_name: str,
@@ -310,60 +377,77 @@ class TelegramProvider(StorageProvider):
     async def scan_folder_messages(self, folder_name: str) -> List[dict]:
         """Scan channel message history for DB rebuild.
 
-        NOTE: Telegram Bot accounts CANNOT use GetHistoryRequest /
-        iter_messages().  When running as a bot the scan is skipped and
-        the caller should rely on PostgreSQL as the authoritative index
-        (uploads already record metadata at write time).
+        Bots cannot use GetHistoryRequest (iter_messages), but CAN query
+        batches of message IDs via channels.GetMessagesRequest.
         """
         assert self.client is not None
-
-        if self._is_bot:
-            log.warning(
-                "SYSTEM: scan_folder_messages — skipped (bot accounts cannot "
-                "read channel history via GetHistoryRequest). "
-                "PostgreSQL is the authoritative file index in bot mode."
-            )
-            return []
-
         if not self._storage_channel_id:
             log.warning("SYSTEM: scan_folder_messages — _storage_channel_id is not set")
             return []
 
-        # Resolve the channel entity to ensure access hash is cached
-        try:
-            from telethon.tl.types import PeerChannel
-            peer = PeerChannel(channel_id=self._storage_channel_id)
-            entity = await self.client.get_entity(peer)
-            log.info("SYSTEM: scan_folder_messages — resolved channel: %s (id=%s)", entity.title, entity.id)
-        except Exception as exc:
-            log.warning("SYSTEM: scan_folder_messages — could not resolve channel %s: %s", self._storage_channel_id, exc)
+        entity = await self._resolve_storage_entity()
+        if not entity:
             return []
 
         messages = []
-        try:
-            async for msg in self.client.iter_messages(entity):
-                if msg.media is None:
-                    continue
-
-                caption = msg.text or (msg.message if hasattr(msg, "message") else "")
-                file_name = None
-                file_size = 0
-
-                if hasattr(msg.media, "document") and msg.media.document:
-                    file_size = msg.media.document.size or 0
-                    for attr in msg.media.document.attributes:
-                        if hasattr(attr, "file_name") and attr.file_name:
-                            file_name = attr.file_name
-                            break
-
-                messages.append({
-                    "msg_id": msg.id,
-                    "caption": caption,
-                    "file_name": file_name,
-                    "file_size": file_size,
-                })
-        except Exception as exc:
-            log.warning("SYSTEM: scan_folder_messages — iter_messages failed: %s", exc)
+        if self._is_bot:
+            log.info("SYSTEM: scan_folder_messages — scanning via batch GetMessagesRequest for bot...")
+            batch_size = 100
+            start_id = 1
+            empty_batches = 0
+            while empty_batches < 2 and start_id < 20000:
+                ids = list(range(start_id, start_id + batch_size))
+                try:
+                    batch = await self.client.get_messages(entity, ids=ids)
+                    valid = [m for m in batch if m]
+                    if not valid:
+                        empty_batches += 1
+                    else:
+                        empty_batches = 0
+                        for msg in valid:
+                            if msg.media is None:
+                                continue
+                            caption = msg.text or ""
+                            file_name = None
+                            file_size = 0
+                            if hasattr(msg.media, "document") and msg.media.document:
+                                file_size = msg.media.document.size or 0
+                                for attr in msg.media.document.attributes:
+                                    if hasattr(attr, "file_name") and attr.file_name:
+                                        file_name = attr.file_name
+                                        break
+                            messages.append({
+                                "msg_id": msg.id,
+                                "caption": caption,
+                                "file_name": file_name,
+                                "file_size": file_size,
+                            })
+                except Exception as exc:
+                    log.warning("SYSTEM: scan_folder_messages batch %d-%d error: %s", start_id, start_id + batch_size, exc)
+                    empty_batches += 1
+                start_id += batch_size
+        else:
+            try:
+                async for msg in self.client.iter_messages(entity):
+                    if msg.media is None:
+                        continue
+                    caption = msg.text or ""
+                    file_name = None
+                    file_size = 0
+                    if hasattr(msg.media, "document") and msg.media.document:
+                        file_size = msg.media.document.size or 0
+                        for attr in msg.media.document.attributes:
+                            if hasattr(attr, "file_name") and attr.file_name:
+                                file_name = attr.file_name
+                                break
+                    messages.append({
+                        "msg_id": msg.id,
+                        "caption": caption,
+                        "file_name": file_name,
+                        "file_size": file_size,
+                    })
+            except Exception as exc:
+                log.warning("SYSTEM: scan_folder_messages — iter_messages failed: %s", exc)
 
         log.info("SYSTEM: scan_folder_messages — found %d messages with media", len(messages))
         return messages

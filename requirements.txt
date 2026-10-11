@@ -8,3 +8,4 @@ sqlalchemy>=2.0
 asyncpg
 psycopg[binary]
 pyjwt
+cryptg

@@ -33,9 +33,13 @@ def split_file(path: Path, chunk_size: int = CHUNK_SIZE) -> List[Path]:
     """
     Split *path* into sequentially numbered chunks inside TEMP_DIR.
 
-    Returns a list of chunk file paths in order.
+    If file is smaller than chunk_size (<= 2 GB), returns [path] directly
+    without duplicating or chopping into chunks.
     """
     file_size = path.stat().st_size
+    if file_size <= chunk_size:
+        return [path]
+
     num_chunks = max(1, math.ceil(file_size / chunk_size))
     chunk_paths: List[Path] = []
 
@@ -58,6 +62,8 @@ def split_file(path: Path, chunk_size: int = CHUNK_SIZE) -> List[Path]:
 
 def merge_chunks(chunk_paths: List[Path], output_path: Path) -> None:
     """Concatenate *chunk_paths* in order and write to *output_path*."""
+    if len(chunk_paths) == 1 and chunk_paths[0].resolve() == output_path.resolve():
+        return
     with open(output_path, "wb") as dst:
         for cp in chunk_paths:
             with open(cp, "rb") as src:
@@ -68,9 +74,11 @@ def merge_chunks(chunk_paths: List[Path], output_path: Path) -> None:
                     dst.write(block)
 
 
-def cleanup_chunks(chunk_paths: List[Path]) -> None:
-    """Remove temporary chunk files."""
+def cleanup_chunks(chunk_paths: List[Path], preserve_path: Optional[Path] = None) -> None:
+    """Remove temporary chunk files, preserving the source file if specified."""
     for cp in chunk_paths:
+        if preserve_path and cp.resolve() == preserve_path.resolve():
+            continue
         try:
             cp.unlink(missing_ok=True)
         except OSError:

@@ -8,3 +8,5 @@ index.db
 salt.bin
 tmp/
 *.session
+cookies.txt
+.freebuff/

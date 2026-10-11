@@ -229,7 +229,10 @@
             <div id="upload-progress-container" class="upload-progress hidden">
                 <div class="upload-progress-row">
                     <span id="upload-filename">Uploading…</span>
-                    <span id="upload-percent">0%</span>
+                    <div class="upload-progress-actions">
+                        <span id="upload-percent">0%</span>
+                        <button type="button" id="upload-cancel-btn" class="upload-cancel-btn hidden" onclick="cancelUpload()" title="Cancel upload">✕ Cancel</button>
+                    </div>
                 </div>
                 <div class="progress-track"><div class="progress-fill" id="upload-progress-fill"></div></div>
             </div>
@@ -346,6 +349,6 @@
     <button class="menu-item danger" onclick="deleteFolderAction()">Delete</button>
 </div>
 
-<script src="/app.js?v=61"></script>
+<script src="/app.js?v=70"></script>
 </body>
 </html>

@@ -89,9 +89,10 @@ TEMP_DIR: Path = APP_DIR / "tmp"
 TEMP_DIR.mkdir(parents=True, exist_ok=True)
 
 # ──────────────────────────────────────────────
-# Chunk settings (20 MB — safe for Render free tier ~512 MB RAM)
+# Chunk settings (2000 MB / 2 GB — native Telegram document limit)
+# Files up to 2 GB are uploaded whole without splitting.
 # ──────────────────────────────────────────────
-CHUNK_SIZE: int = 20 * 1024 * 1024  # 20 MB
+CHUNK_SIZE: int = env_int("CHUNK_SIZE", 2000 * 1024 * 1024)  # 2 GB
 
 # ──────────────────────────────────────────────
 # Upload / download concurrency
@@ -103,5 +104,5 @@ MAX_CONCURRENT_DOWNLOADS: int = 1
 # ──────────────────────────────────────────────
 # Rate limiting — anti-ban
 # ──────────────────────────────────────────────
-RATE_LIMIT_DELAY: float = env_float("RATE_LIMIT_DELAY", 2.0)        # seconds between API calls
+RATE_LIMIT_DELAY: float = env_float("RATE_LIMIT_DELAY", 0.5)        # seconds between API calls
 MAX_REQUESTS_PER_MINUTE: int = env_int("MAX_REQUESTS_PER_MINUTE", 20)

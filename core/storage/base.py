@@ -7,7 +7,7 @@ interface to be used by the application.
 
 from abc import ABC, abstractmethod
 from pathlib import Path
-from typing import List, Optional
+from typing import AsyncIterator, List, Optional
 
 
 class StorageProvider(ABC):
@@ -108,6 +108,23 @@ class StorageProvider(ABC):
         Download file chunks from the given folder.
 
         Returns an ordered list of local chunk paths.
+        """
+        ...
+
+    @abstractmethod
+    async def stream_file(
+        self,
+        folder_name: str,
+        msg_ids: List[int],
+        start: int = 0,
+        end: Optional[int] = None,
+        filename: str = "",
+        file_hash: str = "",
+        file_size: Optional[int] = None,
+    ) -> AsyncIterator[bytes]:
+        """
+        Stream a byte range [start, end] of a file from the storage backend.
+        Yields raw byte chunks without saving the entire file to disk first.
         """
         ...
 
