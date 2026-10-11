@@ -102,18 +102,18 @@ const APPEARANCE_KEY = "td.appearance";
 const APPEARANCES = ["terminal", "liquid-light", "liquid-dark"];
 const APPEARANCE_TINT = {
     "terminal": "#040705",
-    "liquid-light": "#ece9dc",
-    "liquid-dark": "#0b0c07",
+    "liquid-light": "#f5f0e8",
+    "liquid-dark": "#141311",
 };
 
 function readStoredAppearance() {
-    let saved = "liquid-dark";
+    let saved = "liquid-light";
     try { saved = localStorage.getItem(APPEARANCE_KEY) || saved; } catch (_) { }
-    return APPEARANCES.includes(saved) ? saved : "liquid-dark";
+    return APPEARANCES.includes(saved) ? saved : "liquid-light";
 }
 
 function applyAppearance(name) {
-    const appearance = APPEARANCES.includes(name) ? name : "liquid-dark";
+    const appearance = APPEARANCES.includes(name) ? name : "liquid-light";
     const root = document.documentElement;
 
     root.dataset.ui = appearance === "terminal" ? "terminal" : "liquid";

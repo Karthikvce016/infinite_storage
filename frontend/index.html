@@ -1,69 +1,124 @@
 <!DOCTYPE html>
-<html lang="en" data-ui="liquid" data-mode="dark">
+<html lang="en" data-ui="liquid" data-mode="light">
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Telegram Drive</title>
     <meta name="description" content="Private cloud storage for your Telegram channel. Browse, preview and stream your files.">
-    <meta name="theme-color" id="meta-theme-color" content="#0b0c07">
+    <meta name="theme-color" id="meta-theme-color" content="#f5f0e8">
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Fraunces:ital,opsz,wght@0,9..144,400..700;1,9..144,400..700&family=Newsreader:ital,opsz,wght@0,6..72,400..700;1,6..72,400..700&family=Plus+Jakarta+Sans:ital,wght@0,300..700;1,300..700&family=JetBrains+Mono:wght@400..600&display=swap" rel="stylesheet">
     <script>
         /* Apply the saved appearance before first paint so there is no flash. */
         (function () {
             var KEYS = { 'terminal': 1, 'liquid-light': 1, 'liquid-dark': 1 };
-            var saved = 'liquid-dark';
+            var TINTS = { 'terminal': '#040705', 'liquid-light': '#f5f0e8', 'liquid-dark': '#141311' };
+            var saved = 'liquid-light';
             try { saved = localStorage.getItem('td.appearance') || saved; } catch (e) { }
-            if (!KEYS[saved]) saved = 'liquid-dark';
+            if (!KEYS[saved]) saved = 'liquid-light';
             var root = document.documentElement;
             root.dataset.ui = saved === 'terminal' ? 'terminal' : 'liquid';
             root.dataset.mode = saved === 'liquid-light' ? 'light' : 'dark';
+            var meta = document.getElementById('meta-theme-color');
+            if (meta) meta.setAttribute('content', TINTS[saved]);
         })();
     </script>
-    <link rel="stylesheet" href="/styles.css?v=61">
+    <link rel="stylesheet" href="/styles.css?v=82">
 </head>
 <body>
 
 <!-- ═══════════ LOGIN ═══════════ -->
 <div id="login-screen" class="screen screen-login active">
 
-    <div class="appearance-switcher switcher-floating" role="group" aria-label="Interface style">
-        <button class="appearance-btn" data-appearance="terminal" onclick="setAppearance('terminal')" title="Terminal - green hacker" aria-label="Terminal style">
-            <span class="glyph" aria-hidden="true">&gt;_</span>
-        </button>
-        <button class="appearance-btn" data-appearance="liquid-light" onclick="setAppearance('liquid-light')" title="Liquid glass - light" aria-label="Liquid glass light">
-            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" aria-hidden="true">
-                <circle cx="12" cy="12" r="4.2"/><path d="M12 2.6v2.2M12 19.2v2.2M2.6 12h2.2M19.2 12h2.2M5.3 5.3l1.6 1.6M17.1 17.1l1.6 1.6M18.7 5.3l-1.6 1.6M6.9 17.1l-1.6 1.6"/>
-            </svg>
-        </button>
-        <button class="appearance-btn" data-appearance="liquid-dark" onclick="setAppearance('liquid-dark')" title="Liquid glass - dark" aria-label="Liquid glass dark">
-            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" aria-hidden="true">
-                <path d="M20.3 14.2A8.4 8.4 0 0 1 9.8 3.7a8.6 8.6 0 1 0 10.5 10.5Z"/>
-            </svg>
-        </button>
-    </div>
+    <header class="login-header-bar">
+        <div class="login-header-left">
+            <div class="login-brand-monogram">
+                <span class="monogram-box" aria-hidden="true">
+                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
+                        <path d="M20.5 7.5 12 3 3.5 7.5v9L12 21l8.5-4.5v-9Z"/><path d="M3.5 7.5 12 12l8.5-4.5M12 12v9"/>
+                    </svg>
+                </span>
+                <span class="monogram-text">Telegram Drive</span>
+                <span class="monogram-tag">/ VAULT AUTH</span>
+            </div>
+            <span class="login-header-dot" aria-hidden="true">•</span>
+            <div class="daemon-status-pill">
+                <span class="daemon-pulse-dot" aria-hidden="true">
+                    <span class="pulse-ring"></span>
+                    <span class="pulse-core"></span>
+                </span>
+                <span>Gateway daemon <span class="daemon-sub">v4.1 • Operational</span></span>
+            </div>
+        </div>
+
+        <div class="appearance-switcher" role="group" aria-label="Interface style">
+            <button class="appearance-btn" data-appearance="terminal" onclick="setAppearance('terminal')" title="Terminal - green hacker" aria-label="Terminal style">
+                <span class="glyph" aria-hidden="true">&gt;_</span>
+            </button>
+            <button class="appearance-btn" data-appearance="liquid-light" onclick="setAppearance('liquid-light')" title="Linen Parchment - Light" aria-label="Linen Parchment light">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" aria-hidden="true">
+                    <circle cx="12" cy="12" r="4.2"/><path d="M12 2.6v2.2M12 19.2v2.2M2.6 12h2.2M19.2 12h2.2M5.3 5.3l1.6 1.6M17.1 17.1l1.6 1.6M18.7 5.3l-1.6 1.6M6.9 17.1l-1.6 1.6"/>
+                </svg>
+            </button>
+            <button class="appearance-btn" data-appearance="liquid-dark" onclick="setAppearance('liquid-dark')" title="Smoked Walnut - Dark" aria-label="Smoked Walnut dark">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" aria-hidden="true">
+                    <path d="M20.3 14.2A8.4 8.4 0 0 1 9.8 3.7a8.6 8.6 0 1 0 10.5 10.5Z"/>
+                </svg>
+            </button>
+        </div>
+    </header>
 
     <div class="login-wrap">
         <form id="login-form" class="login-card" onsubmit="event.preventDefault(); login();">
+            <div class="card-corner-watermark" aria-hidden="true">SEC-ID // 0x48FA</div>
             <div class="term-bar" aria-hidden="true">
                 <span class="term-dot"></span><span class="term-dot"></span><span class="term-dot"></span>
                 <span class="term-path">visitor@telegram-drive: ~</span>
             </div>
 
-            <div class="login-mark" aria-hidden="true">
-                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
-                    <path d="M20.5 7.5 12 3 3.5 7.5v9L12 21l8.5-4.5v-9Z"/><path d="M3.5 7.5 12 12l8.5-4.5M12 12v9"/>
-                </svg>
+            <div class="login-card-cluster">
+                <div class="login-mark" aria-hidden="true">
+                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
+                        <path d="M20.5 7.5 12 3 3.5 7.5v9L12 21l8.5-4.5v-9Z"/><path d="M3.5 7.5 12 12l8.5-4.5M12 12v9"/>
+                    </svg>
+                </div>
+
+                <div class="archival-meta-badge">
+                    <span class="meta-badge-dot" aria-hidden="true"></span>
+                    <span>END-TO-END SHARDED VAULT • CHANNEL BACKED</span>
+                </div>
+
+                <h1 class="login-title">Telegram Drive<span class="brand-caret" aria-hidden="true">_</span></h1>
+                <p class="login-subtitle"><span class="prompt" aria-hidden="true">$&nbsp;</span>Private cloud storage, powered by your Telegram channel</p>
             </div>
 
-            <h1 class="login-title">Telegram Drive<span class="brand-caret" aria-hidden="true">_</span></h1>
-            <p class="login-subtitle"><span class="prompt" aria-hidden="true">$&nbsp;</span>Private cloud storage, powered by your Telegram channel</p>
+            <div class="vault-node-pill">
+                <div class="node-pill-info">
+                    <svg class="node-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round">
+                        <rect x="2" y="2" width="20" height="8" rx="2"/><rect x="2" y="14" width="20" height="8" rx="2"/><line x1="6" y1="6" x2="6.01" y2="6"/><line x1="6" y1="18" x2="6.01" y2="18"/>
+                    </svg>
+                    <div class="node-pill-text">
+                        <span class="node-pill-label">TARGET STORAGE NODE</span>
+                        <span class="node-pill-channel">@telegram_channel_vault</span>
+                    </div>
+                </div>
+                <span class="node-pill-badge">CONNECTED</span>
+            </div>
 
-            <label class="field">
-                <input type="password" id="password-input" placeholder=" " autocomplete="current-password" required>
-                <span class="field-label">Master password</span>
-            </label>
+            <div class="field-cluster">
+                <div class="field-header">
+                    <span class="field-title">Master vault keypass</span>
+                    <span class="field-crypto-spec">256-BIT PBKDF2</span>
+                </div>
+                <label class="field">
+                    <input type="password" id="password-input" placeholder=" " autocomplete="current-password" required>
+                    <span class="field-label">Master password</span>
+                </label>
+            </div>
 
             <button id="login-btn" class="btn btn-primary btn-block" type="submit">
-                <span class="btn-text">Unlock vault</span>
+                <span class="btn-text">Unlock vault archive</span>
                 <span class="btn-loader hidden" aria-hidden="true"></span>
                 <svg class="btn-arrow" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
                     <path d="M5 12h13"/><path d="m12 5 7 7-7 7"/>
@@ -71,7 +126,11 @@
             </button>
 
             <div id="login-error" class="form-error hidden" role="alert"></div>
-            <p class="login-hint">Protected by <code>APP_PASSWORD</code></p>
+            <div class="login-security-footer">
+                <span>PROTECTED BY <code>APP_PASSWORD</code></span>
+                <span class="footer-sep">•</span>
+                <span>TELEGRAM MTPROTO</span>
+            </div>
         </form>
     </div>
 </div>
@@ -349,6 +408,6 @@
     <button class="menu-item danger" onclick="deleteFolderAction()">Delete</button>
 </div>
 
-<script src="/app.js?v=70"></script>
+<script src="/app.js?v=82"></script>
 </body>
 </html>
