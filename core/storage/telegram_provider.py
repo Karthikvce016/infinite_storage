@@ -395,7 +395,7 @@ class TelegramProvider(StorageProvider):
             batch_size = 100
             start_id = 1
             empty_batches = 0
-            while empty_batches < 2 and start_id < 20000:
+            while empty_batches < 5 and start_id < 20000:
                 ids = list(range(start_id, start_id + batch_size))
                 try:
                     batch = await self.client.get_messages(entity, ids=ids)

@@ -38,7 +38,8 @@ async def rebuild_index(
     """
     from config.settings import DEFAULT_FOLDER_NAME
 
-    log.info("SYSTEM: Starting DB rebuild for owner '%s'...", owner)
+    is_bot = getattr(storage, 'is_bot', False)
+    log.info("SYSTEM: Starting DB rebuild for owner '%s' (bot_mode=%s)...", owner, is_bot)
 
     # ── STEP 1: Ensure the default folder exists (do NOT clear DB) ──
     channel_id = 0
@@ -60,7 +61,7 @@ async def rebuild_index(
     if not messages:
         log.warning("SYSTEM: No messages found in channel. Either the channel is empty, "
                     "the bot cannot access the channel, or the channel ID is wrong.")
-        return {"folders": 1, "files": 0}
+        return {"folders": 1, "files": 0, "bot_mode": is_bot}
 
     # Group chunks by filename
     file_chunks: dict[str, dict] = defaultdict(lambda: {
@@ -140,6 +141,6 @@ async def rebuild_index(
         DEFAULT_FOLDER_NAME, total_files, skipped_files,
     )
 
-    summary = {"folders": 1, "files": total_files, "skipped": skipped_files}
+    summary = {"folders": 1, "files": total_files, "skipped": skipped_files, "bot_mode": is_bot}
     log.info("SYSTEM: DB rebuild complete — %s", summary)
     return summary

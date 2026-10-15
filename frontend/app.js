@@ -2163,8 +2163,8 @@ async function rebuildIndex() {
         const data = await res.json();
         if (!res.ok) throw new Error(data.error || "Sync failed");
 
-        if (data.summary && data.summary.bot_mode) {
-            dismissToast(showToast("Bot mode: channel history can’t be scanned. New uploads are indexed directly."), 7000);
+        if (data.summary && data.summary.bot_mode && data.summary.files === 0) {
+            dismissToast(showToast("Bot mode: no files found in channel scan. New uploads are indexed directly.", "warning"), 7000);
         } else if (data.summary) {
             dismissToast(showToast(`Vault rebuilt: ${data.summary.files} files, ${data.summary.folders} folders indexed.`), 6000);
         } else {

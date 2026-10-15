@@ -7,7 +7,7 @@ Chunks at 20 MB (configurable) to stay within Render free tier constraints.
 import hashlib
 import math
 from pathlib import Path
-from typing import List
+from typing import List, Optional
 
 from config.settings import CHUNK_SIZE, TEMP_DIR
 
