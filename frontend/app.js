@@ -79,6 +79,7 @@ const searchClearBtn = $("search-clear-btn");
 // ══════════════════════════════════════════════
 document.addEventListener("DOMContentLoaded", async () => {
     initAppearance();
+    initAmbientField();
     bindInteractiveEffects();
     try {
         const res = await fetch("/api/auth/check");
@@ -101,9 +102,9 @@ document.addEventListener("DOMContentLoaded", async () => {
 const APPEARANCE_KEY = "td.appearance";
 const APPEARANCES = ["terminal", "liquid-light", "liquid-dark"];
 const APPEARANCE_TINT = {
-    "terminal": "#040705",
-    "liquid-light": "#f5f0e8",
-    "liquid-dark": "#141311",
+    "terminal": "#070a08",
+    "liquid-light": "#f4f7f5",
+    "liquid-dark": "#070204",
 };
 
 function readStoredAppearance() {
@@ -129,6 +130,18 @@ function applyAppearance(name) {
 
     const meta = $("meta-theme-color");
     if (meta) meta.setAttribute("content", APPEARANCE_TINT[appearance]);
+
+    // WebGL rainbow only breathes in light liquid mode
+    const bd = window.__liquidBackdrop;
+    if (bd) {
+        if (root.dataset.ui === "liquid" && root.dataset.mode === "light") {
+            bd.play();
+            root.dataset.liquidBackdrop = "on";
+        } else {
+            bd.pause();
+            root.dataset.liquidBackdrop = "off";
+        }
+    }
 }
 
 function initAppearance() {
@@ -148,6 +161,520 @@ function bindInteractiveEffects() {
 }
 
 // ══════════════════════════════════════════════
+//  Ambient layers (light mode)
+//  - Injects .ambient-field (animated oily washes) into <body>.
+//  - Sakura petal engine on a dedicated fixed canvas.
+//  Petals stay ambient: they never sit above panels or intercept
+//  pointer input, and they honour prefers-reduced-motion.
+// ══════════════════════════════════════════════
+
+function initAmbientField() {
+    const field = document.createElement("div");
+    field.className = "ambient-field";
+    field.setAttribute("aria-hidden", "true");
+    document.body.prepend(field);
+
+    // Depth order: oily/smoke field → wind ribbons → petals
+    const svg = document.getElementById("wind-ribbons");
+    if (svg) document.body.insertBefore(svg, field.nextSibling);
+
+    if (document.querySelector("#sakura-layer")) return;
+    const canvas = document.createElement("canvas");
+    canvas.id = "sakura-layer";
+    canvas.setAttribute("aria-hidden", "true");
+    document.body.insertBefore(canvas, svg ? svg.nextSibling : field.nextSibling);
+
+    initSakuraPetals(canvas);
+    initLiquidBackdrop();
+}
+
+// ══════════════════════════════════════════════
+//  WebGL rainbow backdrop (light liquid mode)
+//  Vendors gradient-backdrops (MIT, dependency-free): a live
+//  mesh-gradient rainbow — the "whole bucket" of colour the light
+//  theme was missing. Mounted below every layer and below the
+//  panels' films; the CSS oily field steps aside when it runs.
+// ══════════════════════════════════════════════
+function initLiquidBackdrop() {
+    const mk = window.GradientBackdrop && window.GradientBackdrop.createBackdrop;
+    if (!mk) return;
+    const root = document.documentElement;
+    const light = root.dataset.ui === "liquid" && root.dataset.mode === "light";
+
+    const host = document.createElement("div");
+    host.id = "liquid-backdrop";
+    host.setAttribute("aria-hidden", "true");
+    // Static pale rainbow first paint, so WebGL boot never flashes blank
+    host.style.background =
+        "radial-gradient(42vw 36vw at 12% 8%, rgba(245, 198, 216, .8), transparent 70%)," +
+        "radial-gradient(40vw 34vw at 88% 14%, rgba(243, 230, 168, .75), transparent 70%)," +
+        "radial-gradient(44vw 40vw at 10% 60%, rgba(191, 232, 198, .75), transparent 72%)," +
+        "radial-gradient(42vw 38vw at 92% 80%, rgba(216, 194, 238, .75), transparent 72%)," +
+        "radial-gradient(40vw 36vw at 38% 92%, rgba(185, 220, 242, .75), transparent 70%)," +
+        "radial-gradient(38vw 34vw at 60% 42%, rgba(246, 217, 176, .7), transparent 72%)," +
+        "linear-gradient(180deg, #f7f4ec, #f2efe6)";
+    document.body.insertBefore(host, document.body.firstChild);
+
+    try {
+        const bd = mk(host, {
+            style: "liquid",
+            colors: ["#f5c6d8", "#f6d9b0", "#f3e6a8", "#bfe8c6", "#b9dcf2", "#d8c2ee"],
+            params: {
+                scale: 0.7,
+                flow: 1.0,
+                mx: 0.5, my: 0.5,
+                energy: 0,
+                rx: 0.5, ry: 0.5,
+                age: 99,
+            },
+            speed: 0.65,         // calm current while idle, hand stirs on top
+            grain: 0.10,
+            animate: light,      // starts paused until light mode is on
+        });
+        window.__liquidBackdrop = bd;
+        if (light) root.dataset.liquidBackdrop = "on";
+        wireLiquidDye(bd);
+    } catch (_err) {
+        host.remove();           // engine refused: CSS oily field keeps the job
+    }
+}
+
+// ── Interaction: the dye is wet ──
+// Hovering stirs a local swirl that follows the hand and settles when
+// you rest; every click drops a damped ripple through the pool.
+const dye = { mx: .5, my: .5, tmx: .5, tmy: .5, energy: 0, click: null, L: null };
+
+function onDyeMove(e) {
+    const L = dye.L;
+    if (!L) return;
+    const x = Math.min(1, Math.max(0, e.clientX / L.innerWidth));
+    const y = Math.min(1, Math.max(0, e.clientY / L.innerHeight));
+    const dx = x - dye.tmx, dy = y - dye.tmy;
+    dye.energy = Math.min(0.62, dye.energy + Math.hypot(dx, dy) * 3);
+    dye.tmx = x; dye.tmy = y;
+}
+
+function onDyeDown(e) {
+    const L = dye.L;
+    if (!L) return;
+    dye.click = {
+        x: Math.min(1, Math.max(0, e.clientX / L.innerWidth)),
+        y: Math.min(1, Math.max(0, e.clientY / L.innerHeight)),
+        t: 0,
+    };
+}
+
+function driveDye() {
+    const root = document.documentElement;
+    const bd = window.__liquidBackdrop;
+    if (bd && root.dataset.liquidBackdrop === "on" && !document.hidden) {
+        dye.mx += (dye.tmx - dye.mx) * 0.085;
+        dye.my += (dye.tmy - dye.my) * 0.085;
+        dye.energy *= 0.955;
+        bd.params.mx = dye.mx;
+        bd.params.my = dye.my;
+        bd.params.energy = dye.energy;
+        if (dye.click) {
+            dye.click.t = Math.min(4, dye.click.t + 0.0167);
+            bd.params.rx = dye.click.x;
+            bd.params.ry = dye.click.y;
+            bd.params.age = dye.click.t;
+        }
+    }
+    requestAnimationFrame(driveDye);
+}
+
+function wireLiquidDye() {
+    if (dye.L) return;
+    dye.L = window;
+    window.addEventListener("pointermove", onDyeMove, { passive: true });
+    window.addEventListener("pointerdown", onDyeDown, { passive: true });
+    requestAnimationFrame(driveDye);
+}
+
+/**
+ * Petal engine: soft rounded petals with two-tone fill, spin, sway
+ * and slow fall. Transform-free (direct canvas painting), pauses on
+ * hidden tabs, disables fully under reduced motion.
+ */
+function initSakuraPetals(canvas) {
+    const reduced = window.matchMedia("(prefers-reduced-motion: reduce)");
+    if (reduced.matches) return;
+
+    const ctx = canvas.getContext("2d");
+    if (!ctx) return;
+    const DPR = Math.min(window.devicePixelRatio || 1, 2);
+
+    function resize() {
+        canvas.width = Math.floor(innerWidth * DPR);
+        canvas.height = Math.floor(innerHeight * DPR);
+        canvas.style.width = `${innerWidth}px`;
+        canvas.style.height = `${innerHeight}px`;
+        ctx.setTransform(DPR, 0, 0, DPR, 0, 0);
+    }
+    resize();
+
+    // ── Palettes ──
+    // dark : BLOOD RED ONLY — deep crimson to hot scarlet, white-hot
+    //        rim lights, baked glow. No pink, no pale.
+    // light: rose sakura against porcelain, with a vivid red share.
+    const PALETTES = {
+        dark: {
+            base: ["#9c0a16", "#c80c1e", "#e60f24", "#ff2c3c", "#d40d20", "#ff4a52"],
+            hi:   "rgba(255, 196, 200, 0.92)",
+            rim:  "rgba(255, 110, 122, 0.80)",
+            vein: "rgba(96, 4, 14, 0.65)",
+            glow: true,
+        },
+        light: {
+            base: ["#f2a7bb", "#f7c4c4", "#e4637f", "#e81430", "#ff4646", "#c21022"],
+            hi:   "rgba(255, 238, 238, 0.9)",
+            rim:  "rgba(160, 30, 52, 0.40)",
+            vein: "rgba(190, 60, 90, 0.50)",
+            glow: false,
+        },
+    };
+
+    // ── Sakura geometry ──
+    // Matched to the reference: a near-circular fan (width ≈ 0.88 ×
+    // height) whose two big rounded lobes meet a deep, narrow heart
+    // notch that cuts in PAST the vertical middle. That deep V is
+    // what makes it sakura instead of rose.
+    function tracePetal(c, w, h) {
+        c.beginPath();
+        c.moveTo(0, h * 0.48);
+        c.bezierCurveTo(w * 0.36, h * 0.44, w * 0.50, h * 0.24, w * 0.50, h * 0.02);
+        c.bezierCurveTo(w * 0.50, -h * 0.18, w * 0.42, -h * 0.34, w * 0.30, -h * 0.40);
+        c.bezierCurveTo(w * 0.21, -h * 0.45, w * 0.09, -h * 0.44, w * 0.045, -h * 0.34);
+        c.bezierCurveTo(w * 0.018, -h * 0.265, w * 0.004, -h * 0.08, 0, h * 0.02);
+        c.bezierCurveTo(w * -0.004, -h * 0.08, -w * 0.018, -h * 0.265, -w * 0.045, -h * 0.34);
+        c.bezierCurveTo(-w * 0.09, -h * 0.44, -w * 0.21, -h * 0.45, -w * 0.30, -h * 0.40);
+        c.bezierCurveTo(-w * 0.42, -h * 0.34, -w * 0.50, -h * 0.18, -w * 0.50, h * 0.02);
+        c.bezierCurveTo(-w * 0.50, h * 0.24, -w * 0.36, h * 0.44, 0, h * 0.48);
+        c.closePath();
+    }
+
+    const SPRITE = 128;
+    function petalSprite(base, pal) {
+        const s = document.createElement("canvas");
+        s.width = SPRITE; s.height = SPRITE;
+        const c = s.getContext("2d");
+        c.translate(SPRITE / 2, SPRITE / 2);
+
+        const w = SPRITE * 0.70, h = SPRITE * 0.80;
+        if (pal.glow) {                 // baked glow: free per frame
+            c.shadowColor = "rgba(255, 22, 44, 0.60)";
+            c.shadowBlur = 13;
+        }
+
+        // Body: deep blood at the base, hot scarlet mid, translucent
+        // light-red toward the lobes.
+        const grad = c.createLinearGradient(0, h * 0.5, 0, -h * 0.5);
+        grad.addColorStop(0, shade(base, -0.34));
+        grad.addColorStop(0.38, shade(base, -0.06));
+        grad.addColorStop(0.72, base);
+        grad.addColorStop(1, tint(base, 0.46));
+        c.fillStyle = grad;
+        tracePetal(c, w, h);
+        c.fill();
+
+        c.shadowColor = "transparent";
+        c.shadowBlur = 0;
+
+        // Translucent highlights, one catch per lobe + diagonal sheen
+        c.globalAlpha = 0.32;
+        c.fillStyle = tint(base, 0.62);
+        c.beginPath();
+        c.ellipse(w * 0.24, -h * 0.28, w * 0.16, h * 0.13, 0, 0, Math.PI * 2);
+        c.fill();
+        c.beginPath();
+        c.ellipse(-w * 0.24, -h * 0.28, w * 0.16, h * 0.13, 0, 0, Math.PI * 2);
+        c.fill();
+        c.globalAlpha = 0.16;
+        c.fillStyle = "rgba(255, 255, 255, 0.9)";
+        c.beginPath();
+        c.ellipse(w * 0.28, h * 0.10, w * 0.10, h * 0.22, 0.4, 0, Math.PI * 2);
+        c.fill();
+        c.globalAlpha = 1;
+
+        // Center vein (lower half only — the notch owns the top)
+        c.strokeStyle = pal.vein;
+        c.lineWidth = 1.7;
+        c.beginPath();
+        c.moveTo(0, h * 0.40);
+        c.bezierCurveTo(-w * 0.03, h * 0.22, -w * 0.03, h * 0.12, 0, h * 0.06);
+        c.stroke();
+        c.globalAlpha = 0.55;
+        c.lineWidth = 1.1;
+        c.beginPath();
+        c.moveTo(0, h * 0.34);
+        c.quadraticCurveTo(-w * 0.16, h * 0.10, -w * 0.26, -h * 0.06);
+        c.stroke();
+        c.beginPath();
+        c.moveTo(0, h * 0.34);
+        c.quadraticCurveTo(w * 0.16, h * 0.10, w * 0.26, -h * 0.06);
+        c.stroke();
+        c.globalAlpha = 1;
+
+        // Cup shading toward the base (clears the notch floor)
+        c.globalAlpha = 0.25;
+        const cup = c.createLinearGradient(0, h * 0.45, 0, -h * 0.2);
+        cup.addColorStop(0, shade(base, -0.45).replace("rgb(", "rgba(").replace(")", ", 0.9)"));
+        cup.addColorStop(1, "rgba(0,0,0,0)");
+        c.fillStyle = cup;
+        c.beginPath();
+        c.ellipse(0, h * 0.24, w * 0.11, h * 0.13, 0, 0, Math.PI * 2);
+        c.fill();
+        c.globalAlpha = 1;
+
+        // Outline + white-hot rim light tracing both lobes and the V
+        c.strokeStyle = pal.rim;
+        c.lineWidth = pal.glow ? 2.2 : 2.6;
+        if (pal.glow) {
+            c.shadowColor = "rgba(255, 40, 60, 0.55)";
+            c.shadowBlur = 9;
+        }
+        tracePetal(c, w, h);
+        c.stroke();
+        c.shadowColor = "transparent";
+        c.shadowBlur = 0;
+        c.strokeStyle = pal.hi;
+        c.lineWidth = 1.9;
+        c.globalAlpha = 0.85;
+        c.beginPath();
+        c.moveTo(w * 0.30, -h * 0.40);
+        c.bezierCurveTo(w * 0.21, -h * 0.45, w * 0.09, -h * 0.44, w * 0.045, -h * 0.34);
+        c.bezierCurveTo(w * 0.018, -h * 0.265, w * 0.004, -h * 0.08, 0, h * 0.02);
+        c.bezierCurveTo(-w * 0.004, -h * 0.08, -w * 0.018, -h * 0.265, -w * 0.045, -h * 0.34);
+        c.bezierCurveTo(-w * 0.09, -h * 0.44, -w * 0.21, -h * 0.45, -w * 0.30, -h * 0.40);
+        c.stroke();
+        c.globalAlpha = 1;
+
+        return s;
+    }
+
+    function shade(hex, amt) {
+        const n = parseInt(hex.slice(1), 16);
+        const f = Math.max(0, 1 + amt);
+        const to = (v) => Math.min(255, Math.max(0, Math.round(v * f)));
+        return `rgb(${to((n >> 16) & 255)},${to((n >> 8) & 255)},${to(n & 255)})`;
+    }
+    function tint(hex, amt) {
+        const n = parseInt(hex.slice(1), 16);
+        const mix = (v) => Math.round(v + (255 - v) * amt);
+        return `rgb(${mix((n >> 16) & 255)},${mix((n >> 8) & 255)},${mix(n & 255)})`;
+    }
+
+    // Depth-of-field variant: stamp into a tiny canvas, upscale with
+    // smoothing — a soft blur that needs no ctx.filter, cross-platform.
+    function makeBlurry(normalSet) {
+        return normalSet.map(spr => {
+            const b = document.createElement("canvas");
+            b.width = 30; b.height = 30;
+            const c = b.getContext("2d");
+            c.smoothingEnabled = true;
+            c.drawImage(spr, 0, 0, 30, 30);
+            return b;
+        });
+    }
+
+    const sets = { light: {}, dark: {} };
+    for (const mode of Object.keys(PALETTES)) {
+        const pal = PALETTES[mode];
+        sets[mode].normal = pal.base.map(col => petalSprite(col, pal));
+        sets[mode].blurry = makeBlurry(sets[mode].normal);
+    }
+    const setFor = (dark) => dark ? sets.dark : sets.light;
+
+    // ── Population: three parallax depths + DOF heroes + sparks ──
+    const rand = (a, b) => a + Math.random() * (b - a);
+    const LAYERS = [
+        { count: 64, size: [5, 9],   fall: [0.16, 0.38], spin: [0.004, 0.010], alpha: 0.55, dof: false },
+        { count: 52, size: [8, 14],  fall: [0.34, 0.72], spin: [0.007, 0.016], alpha: 0.95, dof: false },
+        { count: 24, size: [15, 24], fall: [0.70, 1.30], spin: [0.010, 0.022], alpha: 1,    dof: true  },
+    ];
+    const petals = [];
+    let heroes = [];
+    let sparks = [];
+
+    function spawn(x, y, layer) {
+        return {
+            x: x ?? rand(innerWidth + 30, innerWidth + 140),
+            y: y ?? rand(-140, innerHeight * 0.9),
+            px: 0, py: 0,
+            size: rand(...layer.size),
+            fall: rand(...layer.fall),
+            spin: rand(...layer.spin) * (Math.random() < 0.5 ? -1 : 1),
+            angle: rand(0, Math.PI * 2),
+            spriteIdx: Math.floor(rand(0, 6)),
+            layer,
+            alphaBoost: rand(0.85, 1),
+        };
+    }
+
+    function populate() {
+        petals.length = 0;
+        let budget = 140;                // hard cap for laptops
+        for (const layer of LAYERS)
+            for (let i = 0; i < layer.count && budget > 0; i++, budget--)
+                petals.push(spawn(rand(-40, innerWidth + 140), rand(-innerHeight, innerHeight), layer));
+        heroes = Array.from({ length: 6 }, () => ({
+            x: rand(innerWidth * 0.15, innerWidth + 120),
+            y: rand(0, innerHeight),
+            size: rand(52, 96),
+            vx: rand(0.06, 0.16),
+            angle: rand(0, Math.PI * 2),
+            spin: rand(0.0012, 0.0032) * (Math.random() < 0.5 ? -1 : 1),
+            spriteIdx: Math.floor(rand(0, 6)),
+        }));
+        sparks = Array.from({ length: 110 }, () => ({
+            x: rand(0, innerWidth),
+            y: rand(0, innerHeight),
+            r: rand(0.6, 1.9),
+            tw: rand(0, Math.PI * 2),
+            ts: rand(0.02, 0.11),
+        }));
+    }
+
+    // ── Spiral current ──
+    // Curl of a slowly-drifting scalar field, so petals ride elegant
+    // vortices instead of raining straight down.
+    let frame = 0;
+    function flow(x, y, s) {
+        const sx = x * s + frame * 0.00022;
+        const sy = y * s - frame * 0.00009;
+        return {
+            x: -Math.sin(sx) * Math.sin(sy),
+            y: -Math.cos(sx) * Math.cos(sy),
+        };
+    }
+
+    // ── Cursor ──
+    const mouse = { x: -9999, y: -9999, tx: -9999, ty: -9999, on: false };
+    addEventListener("pointermove", (e) => {
+        if (!mouse.on) {           // prime so the first move doesn't sweep a wake
+            mouse.x = e.clientX; mouse.y = e.clientY;
+        }
+        mouse.tx = e.clientX; mouse.ty = e.clientY; mouse.on = true;
+    }, { passive: true });
+    addEventListener("pointerleave", () => { mouse.on = false; });
+
+    let raf = 0, running = true, gust = 0;
+
+    function drawTumble(spr, x, y, angle, size, alpha) {
+        const k = size / SPRITE;
+        ctx.save();
+        ctx.globalAlpha = alpha;
+        ctx.translate(x, y);
+        ctx.rotate(angle);
+        ctx.scale(k, k);
+        ctx.drawImage(spr, -SPRITE / 2, -SPRITE / 2);
+        ctx.restore();
+    }
+
+    function tick() {
+        if (!running) return;
+        const root = document.documentElement;
+        const ui = root.dataset.ui;
+        const dark = ui === "liquid" && root.dataset.mode === "dark";
+        if (ui !== "liquid") {
+            raf = requestAnimationFrame(tick);
+            return;
+        }
+        frame++;
+        gust = Math.sin(frame * 0.0021) * 0.6 + Math.sin(frame * 0.0007) * 0.4;
+
+        // Smoothed cursor
+        mouse.x += (mouse.tx - mouse.x) * 0.08;
+        mouse.y += (mouse.ty - mouse.y) * 0.08;
+
+        const set = setFor(dark);
+        ctx.clearRect(0, 0, innerWidth, innerHeight);
+
+        // Petals: spiral current + wind + cursor swirl
+        const spiralS = dark ? 0.0012 : 0.0016;
+        const spiralK = dark ? 1.55 : 0.85;
+        const wind = dark ? -0.10 - gust * 0.08 : -(0.26 + gust * 0.26);
+        for (const p of petals) {
+            p.px = p.x; p.py = p.y;
+            p.angle += p.spin;
+
+            const f = flow(p.x, p.y, spiralS);
+            const layer = p.layer;
+            const depth = layer.dof ? 1.15 : layer === LAYERS[1] ? 0.85 : 0.5;
+            p.x += f.x * spiralK * depth + wind * depth;
+            p.y += f.y * spiralK * depth * 0.8 + p.fall;
+
+            if (mouse.on) {
+                const dx = p.x - mouse.x, dy = p.y - mouse.y;
+                const d2 = dx * dx + dy * dy;
+                if (d2 < 67600 && d2 > 0.01) {          // within 260px
+                    const d = Math.sqrt(d2);
+                    const e = 1 - d / 260;
+                    const push = e * e * 1.7 * depth;
+                    const twist = e * 0.9 * depth;
+                    p.x += (dx / d) * push + (-dy / d) * twist;
+                    p.y += (dy / d) * push + (dx / d) * twist;
+                }
+            }
+
+            if (p.y > innerHeight + 70) Object.assign(p, spawn(null, rand(-180, -40), layer));
+            if (p.x < -80) Object.assign(p, spawn(rand(innerWidth + 30, innerWidth + 140), rand(-120, innerHeight), layer));
+            if (p.x > innerWidth + 150) p.x = -70;
+
+            // Motion-blur ghost for the near layer, then the body
+            if (layer.dof) drawTumble(set.blurry[p.spriteIdx], p.x, p.y, p.angle, p.size, 0.16 * p.alphaBoost);
+            drawTumble(set.normal[p.spriteIdx], p.x, p.y, p.angle, p.size, layer.alpha * p.alphaBoost);
+        }
+
+        // Foreground DOF petals + crimson sparkles (dark mode)
+        if (dark) {
+            for (const h of heroes) {
+                h.x -= h.vx * (1 + gust * 0.4);
+                h.y += Math.sin(frame * 0.008 + h.size) * 0.18;
+                h.angle += h.spin;
+                if (h.x < -140) { h.x = innerWidth + 100; h.y = rand(0, innerHeight); }
+                drawTumble(set.blurry[h.spriteIdx], h.x, h.y, h.angle, h.size, 0.42);
+            }
+            for (const s of sparks) {
+                s.tw += s.ts;
+                s.x -= 0.05; s.y += 0.03;
+                if (s.x < -4) s.x = innerWidth + 4;
+                if (s.y > innerHeight + 4) s.y = -4;
+                const a = 0.18 + 0.72 * Math.abs(Math.sin(s.tw));
+                ctx.globalAlpha = a;
+                ctx.fillStyle = s.r > 1.4 ? "rgba(255, 220, 224, 0.95)" : "rgba(255, 70, 86, 0.9)";
+                ctx.beginPath();
+                ctx.arc(s.x, s.y, s.r, 0, Math.PI * 2);
+                ctx.fill();
+            }
+            ctx.globalAlpha = 1;
+        }
+
+        raf = requestAnimationFrame(tick);
+    }
+
+    document.addEventListener("visibilitychange", () => {
+        if (document.hidden) {
+            running = false;
+            cancelAnimationFrame(raf);
+        } else if (!running) {
+            running = true;
+            tick();
+        }
+    });
+
+    addEventListener("resize", () => {
+        resize();
+        populate();
+    });
+
+    populate();
+    tick();
+}
+
+
+
 //  Auth Flow (Password)
 // ══════════════════════════════════════════════
 function showLoginScreen() {

@@ -5,15 +5,15 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Telegram Drive</title>
     <meta name="description" content="Private cloud storage for your Telegram channel. Browse, preview and stream your files.">
-    <meta name="theme-color" id="meta-theme-color" content="#f5f0e8">
+    <meta name="theme-color" id="meta-theme-color" content="#f4f7f5">
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-    <link href="https://fonts.googleapis.com/css2?family=Fraunces:ital,opsz,wght@0,9..144,400..700;1,9..144,400..700&family=Newsreader:ital,opsz,wght@0,6..72,400..700;1,6..72,400..700&family=Plus+Jakarta+Sans:ital,wght@0,300..700;1,300..700&family=JetBrains+Mono:wght@400..600&display=swap" rel="stylesheet">
+    <link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@400..700&family=Plus+Jakarta+Sans:ital,wght@0,300..700;1,300..700&family=JetBrains+Mono:wght@400..600&display=swap" rel="stylesheet">
     <script>
         /* Apply the saved appearance before first paint so there is no flash. */
         (function () {
             var KEYS = { 'terminal': 1, 'liquid-light': 1, 'liquid-dark': 1 };
-            var TINTS = { 'terminal': '#040705', 'liquid-light': '#f5f0e8', 'liquid-dark': '#141311' };
+            var TINTS = { 'terminal': '#070a08', 'liquid-light': '#f4f7f5', 'liquid-dark': '#070204' };
             var saved = 'liquid-light';
             try { saved = localStorage.getItem('td.appearance') || saved; } catch (e) { }
             if (!KEYS[saved]) saved = 'liquid-light';
@@ -24,9 +24,47 @@
             if (meta) meta.setAttribute('content', TINTS[saved]);
         })();
     </script>
-    <link rel="stylesheet" href="/styles.css?v=82">
+    <link rel="stylesheet" href="/styles.css?v=91">
 </head>
 <body>
+
+<!-- ═══════════ WIND RIBBONS (dark mode background) ═══════════ -->
+<svg id="wind-ribbons" viewBox="0 0 1440 800" preserveAspectRatio="xMidYMid slice" aria-hidden="true">
+    <!-- Ribbon 1: sweeps from top-right, curls down-left -->
+    <g fill="none" stroke-linecap="round">
+        <path class="ribbon-halo" d="M1080 40 C 760 130, 1020 300, 640 330 C 380 350, 220 260, 60 380"
+              stroke="rgba(255, 36, 66, 0.14)" stroke-width="11"/>
+        <path d="M1080 40 C 760 130, 1020 300, 640 330 C 380 350, 220 260, 60 380"
+              stroke="rgba(255, 44, 74, 0.10)" stroke-width="2.6"/>
+        <path class="flow" pathLength="100"
+              d="M1080 40 C 760 130, 1020 300, 640 330 C 380 350, 220 260, 60 380"
+              stroke="rgba(255, 90, 110, 0.85)" stroke-width="2.2"/>
+    </g>
+    <!-- Ribbon 2: lower counter-curl -->
+    <g fill="none" stroke-linecap="round">
+        <path class="ribbon-halo" d="M1180 560 C 880 470, 760 640, 430 560 C 200 500, 90 560, -40 640"
+              stroke="rgba(255, 36, 66, 0.12)" stroke-width="10"/>
+        <path d="M1180 560 C 880 470, 760 640, 430 560 C 200 500, 90 560, -40 640"
+              stroke="rgba(255, 48, 76, 0.09)" stroke-width="2.4"/>
+        <path class="flow slow" pathLength="100"
+              d="M1180 560 C 880 470, 760 640, 430 560 C 200 500, 90 560, -40 640"
+              stroke="rgba(255, 96, 116, 0.8)" stroke-width="2"/>
+    </g>
+    <!-- Ribbon 3: soft mid-field drift -->
+    <g fill="none" stroke-linecap="round">
+        <path class="ribbon-halo" d="M980 700 C 700 760, 470 600, 200 680 C 100 710, 40 700, -60 740"
+              stroke="rgba(255, 36, 66, 0.10)" stroke-width="9"/>
+        <path class="flow" pathLength="100"
+              d="M980 700 C 700 760, 470 600, 200 680 C 100 710, 40 700, -60 740"
+              stroke="rgba(255, 70, 92, 0.65)" stroke-width="1.8"/>
+    </g>
+    <!-- Ribbon 4: high faint arc over the top -->
+    <g fill="none" stroke-linecap="round">
+        <path class="flow slow" pathLength="100"
+              d="M1420 140 C 1180 40, 1020 190, 800 150 C 640 122, 520 40, 360 70"
+              stroke="rgba(255, 120, 134, 0.5)" stroke-width="1.6"/>
+    </g>
+</svg>
 
 <!-- ═══════════ LOGIN ═══════════ -->
 <div id="login-screen" class="screen screen-login active">
@@ -53,15 +91,15 @@
         </div>
 
         <div class="appearance-switcher" role="group" aria-label="Interface style">
-            <button class="appearance-btn" data-appearance="terminal" onclick="setAppearance('terminal')" title="Terminal - green hacker" aria-label="Terminal style">
+            <button class="appearance-btn" data-appearance="terminal" onclick="setAppearance('terminal')" title="Terminal - phosphor on black" aria-label="Terminal style">
                 <span class="glyph" aria-hidden="true">&gt;_</span>
             </button>
-            <button class="appearance-btn" data-appearance="liquid-light" onclick="setAppearance('liquid-light')" title="Linen Parchment - Light" aria-label="Linen Parchment light">
+            <button class="appearance-btn" data-appearance="liquid-light" onclick="setAppearance('liquid-light')" title="Sakura Breeze - Light" aria-label="Sakura Breeze light">
                 <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" aria-hidden="true">
                     <circle cx="12" cy="12" r="4.2"/><path d="M12 2.6v2.2M12 19.2v2.2M2.6 12h2.2M19.2 12h2.2M5.3 5.3l1.6 1.6M17.1 17.1l1.6 1.6M18.7 5.3l-1.6 1.6M6.9 17.1l-1.6 1.6"/>
                 </svg>
             </button>
-            <button class="appearance-btn" data-appearance="liquid-dark" onclick="setAppearance('liquid-dark')" title="Smoked Walnut - Dark" aria-label="Smoked Walnut dark">
+            <button class="appearance-btn" data-appearance="liquid-dark" onclick="setAppearance('liquid-dark')" title="Deep Slate - Dark" aria-label="Deep Slate dark">
                 <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" aria-hidden="true">
                     <path d="M20.3 14.2A8.4 8.4 0 0 1 9.8 3.7a8.6 8.6 0 1 0 10.5 10.5Z"/>
                 </svg>
@@ -182,15 +220,15 @@
             </button>
 
             <div class="appearance-switcher" role="group" aria-label="Interface style">
-                <button class="appearance-btn" data-appearance="terminal" onclick="setAppearance('terminal')" title="Terminal - green hacker" aria-label="Terminal style">
+                <button class="appearance-btn" data-appearance="terminal" onclick="setAppearance('terminal')" title="Terminal - phosphor on black" aria-label="Terminal style">
                     <span class="glyph" aria-hidden="true">&gt;_</span>
                 </button>
-                <button class="appearance-btn" data-appearance="liquid-light" onclick="setAppearance('liquid-light')" title="Liquid glass - light" aria-label="Liquid glass light">
+                <button class="appearance-btn" data-appearance="liquid-light" onclick="setAppearance('liquid-light')" title="Sakura Breeze - light" aria-label="Sakura Breeze light">
                     <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" aria-hidden="true">
                         <circle cx="12" cy="12" r="4.2"/><path d="M12 2.6v2.2M12 19.2v2.2M2.6 12h2.2M19.2 12h2.2M5.3 5.3l1.6 1.6M17.1 17.1l1.6 1.6M18.7 5.3l-1.6 1.6M6.9 17.1l-1.6 1.6"/>
                     </svg>
                 </button>
-                <button class="appearance-btn" data-appearance="liquid-dark" onclick="setAppearance('liquid-dark')" title="Liquid glass - dark" aria-label="Liquid glass dark">
+                <button class="appearance-btn" data-appearance="liquid-dark" onclick="setAppearance('liquid-dark')" title="Deep Slate - dark" aria-label="Deep Slate dark">
                     <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" aria-hidden="true">
                         <path d="M20.3 14.2A8.4 8.4 0 0 1 9.8 3.7a8.6 8.6 0 1 0 10.5 10.5Z"/>
                     </svg>
@@ -408,6 +446,7 @@
     <button class="menu-item danger" onclick="deleteFolderAction()">Delete</button>
 </div>
 
-<script src="/app.js?v=82"></script>
+<script src="/vendor/backdrop.js?v=91"></script>
+<script src="/app.js?v=91"></script>
 </body>
 </html>

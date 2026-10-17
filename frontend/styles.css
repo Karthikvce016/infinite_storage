@@ -1,53 +1,60 @@
 /* ══════════════════════════════════════════════════════════════════
    Telegram Drive — Design System
    ──────────────────────────────────────────────────────────────────
-   Two interfaces, switchable at any time:
-     • liquid  → Apple-style minimal + liquid glass  (light | dark)
-     • terminal → green phosphor / hacker CRT
+   Three interfaces, switchable at any time:
+     • liquid light  → "Sakura Breeze"  · porcelain base, oily
+                       HackerRank-style washes, falling petals
+     • liquid dark   → "Deep Slate"     · blue-black, Tokyo Night accent
+     • terminal      → "Phosphor"       · restrained green on black, no glow
    Every component is token-driven; the theme blocks at the bottom
    only remap tokens (plus a few structural touches).
    ══════════════════════════════════════════════════════════════════ */
 
-/* ─────────────── Tokens: Smoked Walnut Peat (Dark) ─────────────── */
 :root {
-    --font-serif: "Fraunces", "Newsreader", Georgia, serif;
+    --font-display: "Space Grotesk", "Plus Jakarta Sans", sans-serif;
     --font: "Plus Jakarta Sans", -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
     --mono: "JetBrains Mono", ui-monospace, SFMono-Regular, Menlo, monospace;
 
-    --bg: #141311;
-    --bg-gradient: radial-gradient(ellipse 100% 85% at 20% 8%, #1e1b17 0%, #161411 50%, #100f0d 100%);
+    /* Default = Crimson Cyclone (dark liquid) — black smoke ground,
+       glowing crimson petals, luminous wind ribbons */
+    --bg: #040102;
+    --bg-gradient:
+        radial-gradient(ellipse 70% 55% at 76% 22%, rgba(255, 36, 64, .075), transparent 60%),
+        radial-gradient(ellipse 80% 60% at 88% 82%, rgba(150, 10, 34, .09), transparent 60%),
+        radial-gradient(ellipse 90% 70% at 8% 88%, rgba(120, 8, 26, .08), transparent 62%),
+        linear-gradient(160deg, #0a0406 0%, #070203 46%, #040102 100%);
     --bg-blobs:
-        radial-gradient(65vw 55vw at 12% 5%, rgba(161, 184, 121, .20), transparent 65%),
-        radial-gradient(60vw 55vw at 90% 12%, rgba(212, 185, 126, .22), transparent 60%),
-        radial-gradient(65vw 60vw at 70% 98%, rgba(175, 125, 75, .18), transparent 65%),
-        radial-gradient(45vw 40vw at 2% 92%, rgba(161, 184, 121, .15), transparent 60%);
-    --veil: rgba(20, 19, 17, .65);
+        radial-gradient(55vw 48vw at 78% 18%, rgba(214, 24, 56, .085), transparent 62%),
+        radial-gradient(50vw 46vw at 92% 74%, rgba(160, 14, 40, .07), transparent 60%),
+        radial-gradient(58vw 54vw at 12% 86%, rgba(120, 10, 30, .065), transparent 65%),
+        radial-gradient(40vw 36vw at 6% 10%, rgba(140, 12, 36, .055), transparent 60%);
+    --veil: rgba(4, 1, 2, .62);
 
-    --panel: rgba(27, 24, 20, .92);
-    --panel-2: rgba(22, 20, 16, .96);
-    --panel-solid: #1b1915;
-    --card: rgba(35, 31, 26, .82);
-    --card-hover: rgba(46, 41, 34, .95);
-    --well: rgba(21, 19, 16, .85);
+    --panel: rgba(18, 6, 10, .80);
+    --panel-2: rgba(14, 5, 8, .94);
+    --panel-solid: #120509;
+    --card: rgba(42, 13, 21, .62);
+    --card-hover: rgba(58, 18, 27, .90);
+    --well: rgba(8, 3, 5, .82);
 
-    --line: rgba(215, 200, 180, .14);
-    --line-soft: rgba(215, 200, 180, .08);
-    --edge: inset 0 1px 0 rgba(215, 200, 180, .08);
+    --line: rgba(255, 152, 172, .13);
+    --line-soft: rgba(255, 152, 172, .07);
+    --edge: inset 0 1px 0 rgba(255, 190, 205, .05);
 
-    --txt: #f7f2ea;
-    --txt-2: #a89e90;
-    --txt-3: #756c5e;
+    --txt: #f5e5e9;
+    --txt-2: #c2a3ab;
+    --txt-3: #7f6a70;
 
-    --accent: #a1b879;
-    --accent-2: #d4b97e;
-    --accent-soft: rgba(161, 184, 121, .16);
-    --accent-line: rgba(161, 184, 121, .42);
-    --on-accent: #13170c;
+    --accent: #f2273d;
+    --accent-2: #ff8fa0;
+    --accent-soft: rgba(242, 39, 61, .14);
+    --accent-line: rgba(242, 39, 61, .42);
+    --on-accent: #1c0207;
 
-    --danger: #e05d52;
-    --danger-soft: rgba(224, 93, 82, .16);
-    --ok: #6db37b;
-    --warn: #d49e52;
+    --danger: #ef6a55;
+    --danger-soft: rgba(239, 106, 85, .15);
+    --ok: #7fae63;
+    --warn: #d98a44;
 
     --r-xs: 3px;
     --r-sm: 4px;
@@ -58,8 +65,8 @@
 
     --blur: 16px;
     --sat: 120%;
-    --shadow-1: 0 2px 8px rgba(10, 9, 8, .35);
-    --shadow-2: 0 16px 45px rgba(10, 9, 8, .55);
+    --shadow-1: 0 2px 8px rgba(6, 3, 5, .40);
+    --shadow-2: 0 16px 45px rgba(6, 3, 5, .58);
 
     --ease: cubic-bezier(.16, 1, .3, 1);
     --t-fast: .15s var(--ease);
@@ -68,9 +75,6 @@
     --topbar-h: 58px;
     --sidebar-w: 254px;
     --inspector-w: 312px;
-
-    --mx: 50vw;
-    --my: 50vh;
 
     /* Legacy aliases still referenced by inline templates in app.js */
     --emerald: var(--accent);
@@ -85,47 +89,49 @@
     --text-3: var(--txt-3);
 }
 
-/* ─────────────── Tokens: Serene Warm Linen & Almond Cream (Light) ─────────────── */
+/* ─────────────── Tokens: Sakura Breeze (Light) ───────────────
+   Porcelain base; the oily colour field lives in .ambient-field.
+   One UI accent (spruce green); the petals stay ambient. */
 [data-mode="light"] {
-    --bg: #f5f0e8;
-    --bg-gradient: radial-gradient(ellipse 100% 90% at 15% 10%, #fbf8f2 0%, #f4ede2 45%, #e8decb 100%);
+    --bg: #f4f7f5;
+    --bg-gradient: linear-gradient(180deg, #f8faf8 0%, #f2f6f3 52%, #edf3ef 100%);
     --bg-blobs:
-        radial-gradient(65vw 55vw at 8% 5%, rgba(120, 148, 100, .28), transparent 65%),
-        radial-gradient(60vw 55vw at 92% 10%, rgba(214, 180, 120, .30), transparent 60%),
-        radial-gradient(65vw 60vw at 70% 96%, rgba(195, 155, 95, .25), transparent 65%),
-        radial-gradient(45vw 40vw at 2% 92%, rgba(120, 148, 100, .22), transparent 60%);
-    --veil: rgba(245, 240, 232, .55);
+        radial-gradient(58vw 50vw at 10% 4%, rgba(112, 196, 160, .20), transparent 62%),
+        radial-gradient(54vw 48vw at 92% 8%, rgba(250, 222, 168, .22), transparent 60%),
+        radial-gradient(60vw 56vw at 74% 96%, rgba(233, 190, 196, .20), transparent 65%),
+        radial-gradient(44vw 40vw at 4% 90%, rgba(168, 202, 236, .20), transparent 60%);
+    --veil: rgba(244, 247, 245, .55);
 
-    --panel: rgba(254, 251, 246, .94);
-    --panel-2: rgba(250, 246, 239, .97);
-    --panel-solid: #fcf9f3;
-    --card: #faf5ed;
-    --card-hover: #ffffff;
-    --well: #ece3d3;
+    --panel: rgba(248, 251, 249, .44);
+    --panel-2: rgba(246, 249, 247, .62);
+    --panel-solid: #fbfdfc;
+    --card: rgba(255, 255, 255, .78);
+    --card-hover: rgba(255, 255, 255, .97);
+    --well: rgba(28, 44, 36, .05);
 
-    --line: rgba(115, 100, 80, .14);
-    --line-soft: rgba(115, 100, 80, .08);
-    --edge: inset 0 1px 0 rgba(255, 255, 255, .90);
+    --line: rgba(32, 50, 42, .12);
+    --line-soft: rgba(32, 50, 42, .065);
+    --edge: inset 0 1px 0 rgba(255, 255, 255, .92);
 
-    --txt: #26211a;
-    --txt-2: #655a4a;
-    --txt-3: #958672;
+    --txt: #1c2620;
+    --txt-2: #55645b;
+    --txt-3: #8b988f;
 
-    --accent: #485c3e;
-    --accent-2: #876233;
-    --accent-soft: rgba(72, 92, 62, .13);
-    --accent-line: rgba(72, 92, 62, .32);
-    --on-accent: #fbf9f4;
+    --accent: #276b4d;
+    --accent-2: #c15066;
+    --accent-soft: rgba(39, 107, 77, .11);
+    --accent-line: rgba(39, 107, 77, .30);
+    --on-accent: #f7fbf8;
 
-    --danger: #b33e36;
-    --danger-soft: rgba(179, 62, 54, .12);
-    --ok: #427e54;
-    --warn: #a36c2a;
+    --danger: #b94450;
+    --danger-soft: rgba(185, 68, 80, .10);
+    --ok: #3d8f63;
+    --warn: #a9762c;
 
-    --shadow-1: 0 2px 8px rgba(90, 78, 62, .07);
-    --shadow-2: 0 16px 42px rgba(90, 78, 62, .12), 0 3px 10px rgba(90, 78, 62, .06);
-    --sat: 110%;
-    --blur: 16px;
+    --shadow-1: 0 2px 8px rgba(44, 66, 56, .08);
+    --shadow-2: 0 16px 42px rgba(44, 66, 56, .13), 0 3px 10px rgba(44, 66, 56, .06);
+    --sat: 150%;
+    --blur: 20px;
 }
 
 /* ─────────────── Token, base & ambient ─────────────── */
@@ -146,7 +152,7 @@ body {
     text-rendering: optimizeLegibility;
 }
 
-/* Ambient directional linen canvas fade (liquid) / scanlines (terminal) */
+/* Ambient directional wash (liquid) / scanlines (terminal) */
 body::before {
     content: "";
     position: fixed;
@@ -156,18 +162,18 @@ body::before {
     background: var(--bg-gradient);
 }
 
-/* Tactile archival stationery paper grain & linen matrix */
+/* Base grain, retinted per mode */
 [data-ui="liquid"][data-mode="light"] body::before {
     background:
-        radial-gradient(rgba(115, 100, 80, .14) 0.85px, transparent 0.85px) 0 0 / 22px 22px,
-        radial-gradient(rgba(115, 100, 80, .07) 0.85px, transparent 0.85px) 11px 11px / 22px 22px,
+        radial-gradient(rgba(44, 66, 56, .10) 0.85px, transparent 0.85px) 0 0 / 22px 22px,
+        radial-gradient(rgba(44, 66, 56, .05) 0.85px, transparent 0.85px) 11px 11px / 22px 22px,
         var(--bg-gradient);
 }
 
 [data-ui="liquid"][data-mode="dark"] body::before {
     background:
-        radial-gradient(rgba(220, 205, 185, .08) 0.85px, transparent 0.85px) 0 0 / 22px 22px,
-        radial-gradient(rgba(220, 205, 185, .04) 0.85px, transparent 0.85px) 11px 11px / 22px 22px,
+        radial-gradient(rgba(202, 216, 240, .07) 0.85px, transparent 0.85px) 0 0 / 22px 22px,
+        radial-gradient(rgba(202, 216, 240, .035) 0.85px, transparent 0.85px) 11px 11px / 22px 22px,
         var(--bg-gradient);
 }
 
@@ -187,6 +193,141 @@ body::after {
     50% { transform: scale(1.05) translate3d(2.2%, -1.8%, 0); opacity: 1; }
     100% { transform: scale(1.02) translate3d(-1.8%, 2.2%, 0); opacity: .92; }
 }
+
+/* ── Oily ambient field (light mode only) ──
+   Two independently drifting gradient sheets whose washes overlap
+   and shear past each other, HackerRank-style. Each sheet carries
+   its own blur so the filter is rasterised once per layer; the
+   animation is transform-only. Injected by app.js as the first
+   child of <body>, before the screens, so it stays behind content. */
+.ambient-field {
+    display: none;
+}
+[data-ui="liquid"][data-mode="light"] .ambient-field {
+    display: block;
+    position: fixed;
+    inset: -22%;
+    z-index: 0;
+    pointer-events: none;
+}
+[data-ui="liquid"][data-mode="light"] .ambient-field::before,
+[data-ui="liquid"][data-mode="light"] .ambient-field::after {
+    content: "";
+    position: absolute;
+    inset: 0;
+    will-change: transform;
+}
+[data-ui="liquid"][data-mode="light"] .ambient-field::before {
+    background:
+        radial-gradient(38vw 34vw at 22% 26%, rgba(118, 214, 166, .58), transparent 70%),
+        radial-gradient(30vw 28vw at 68% 14%, rgba(252, 228, 158, .55), transparent 68%),
+        radial-gradient(34vw 32vw at 82% 78%, rgba(158, 200, 240, .50), transparent 70%),
+        radial-gradient(26vw 24vw at 14% 84%, rgba(206, 226, 190, .40), transparent 70%);
+    filter: blur(64px) saturate(1.42);
+    animation: oilyDriftA 64s cubic-bezier(.45, .05, .55, .95) infinite alternate;
+}
+[data-ui="liquid"][data-mode="light"] .ambient-field::after {
+    background:
+        radial-gradient(34vw 30vw at 62% 58%, rgba(240, 182, 196, .54), transparent 70%),
+        radial-gradient(28vw 26vw at 88% 30%, rgba(252, 206, 172, .50), transparent 68%),
+        radial-gradient(30vw 30vw at 10% 52%, rgba(140, 196, 228, .46), transparent 70%),
+        radial-gradient(30vw 26vw at 78% 12%, rgba(216, 96, 110, .44), transparent 68%),
+        radial-gradient(24vw 22vw at 45% 90%, rgba(248, 232, 190, .40), transparent 70%);
+    filter: blur(64px) saturate(1.42);
+    animation: oilyDriftB 81s cubic-bezier(.45, .05, .55, .95) infinite alternate;
+}
+@keyframes oilyDriftA {
+    0% { transform: translate3d(-3.5%, -2.5%, 0) scale(1); opacity: .9; }
+    44% { transform: translate3d(3%, 2.8%, 0) scale(1.07); opacity: 1; }
+    100% { transform: translate3d(-1.8%, 3.4%, 0) scale(1.02); opacity: .94; }
+}
+@keyframes oilyDriftB {
+    0% { transform: translate3d(3.2%, 2.6%, 0) scale(1.06); opacity: 1; }
+    50% { transform: translate3d(-3.4%, -3%, 0) scale(1); opacity: .92; }
+    100% { transform: translate3d(2.2%, -3.6%, 0) scale(1.09); opacity: .97; }
+}
+/* The static widen-breathe blobs are redundant under the oily field */
+[data-ui="liquid"][data-mode="light"] body::after { display: none; }
+
+/* ── Crimson smoke (dark mode variant of the ambient field) ──
+   Slow deep-red blotches drifting over the black ground; the
+   petal canvas and wind ribbons ride above it. */
+[data-ui="liquid"][data-mode="dark"] .ambient-field {
+    display: block;
+    position: fixed;
+    inset: -25%;
+    z-index: 0;
+    pointer-events: none;
+    opacity: .8;
+}
+[data-ui="liquid"][data-mode="dark"] .ambient-field::before,
+[data-ui="liquid"][data-mode="dark"] .ambient-field::after {
+    content: "";
+    position: absolute;
+    inset: 0;
+    will-change: transform;
+}
+[data-ui="liquid"][data-mode="dark"] .ambient-field::before {
+    background:
+        radial-gradient(42vw 36vw at 20% 30%, rgba(150, 16, 40, .10), transparent 70%),
+        radial-gradient(34vw 30vw at 72% 12%, rgba(200, 24, 52, .085), transparent 70%),
+        radial-gradient(38vw 34vw at 88% 70%, rgba(110, 10, 30, .095), transparent 70%);
+    filter: blur(70px);
+    animation: oilyDriftB 110s cubic-bezier(.45, .05, .55, .95) infinite alternate;
+}
+[data-ui="liquid"][data-mode="dark"] .ambient-field::after {
+    background:
+        radial-gradient(36vw 32vw at 50% 84%, rgba(160, 14, 40, .085), transparent 70%),
+        radial-gradient(30vw 28vw at 34% 56%, rgba(90, 8, 24, .09), transparent 70%),
+        radial-gradient(26vw 24vw at 94% 40%, rgba(190, 28, 60, .065), transparent 70%);
+    filter: blur(80px);
+    animation: oilyDriftA 130s cubic-bezier(.45, .05, .55, .95) infinite alternate;
+}
+[data-ui="liquid"][data-mode="dark"] body::after { display: none; }
+
+/* ── Wind ribbons (dark mode) ──
+   Luminous red trails curling through the scene, like the
+   reference frame. Static markup in index.html; dash pulses
+   travel along each curl. Depth order: fixed layer above the
+   petal canvas? No — below it, so petals ride the ribbons. */
+#wind-ribbons {
+    position: fixed;
+    inset: 0;
+    width: 100%;
+    height: 100%;
+    z-index: 0;
+    pointer-events: none;
+    display: none;
+}
+[data-ui="liquid"][data-mode="dark"] #wind-ribbons { display: block; }
+#wind-ribbons .ribbon-halo {
+    filter: blur(7px);
+}
+#wind-ribbons .ribbon-core {
+    filter: blur(0.4px);
+}
+#wind-ribbons .flow {
+    stroke-dasharray: 3 9;
+    animation: ribbonFlow 19s linear infinite;
+}
+#wind-ribbons .flow.slow { animation-duration: 27s; animation-direction: reverse; }
+@keyframes ribbonFlow {
+    to { stroke-dashoffset: -48; }
+}
+
+/* ── Sakura petal layer (light mode only) ──
+   The <canvas id="sakura-layer"> is injected by app.js as the first
+   child of <body>; z 0 keeps it behind every screen subtree while
+   sitting above the base gradient. Engine handles reduced motion,
+   tab-hide pausing and DPR. */
+#sakura-layer {
+    position: fixed;
+    inset: 0;
+    z-index: 0;
+    pointer-events: none;
+    display: none;
+}
+[data-ui="liquid"] #sakura-layer { display: block; }
 
 ::selection { background: var(--accent-soft); color: var(--txt); }
 
@@ -501,7 +642,7 @@ body::after {
 }
 .monogram-box svg { width: 14px; height: 14px; }
 .monogram-text {
-    font-family: var(--font-serif);
+    font-family: var(--font-display);
     font-style: italic;
     font-size: 1.14rem;
     font-weight: 600;
@@ -629,7 +770,7 @@ body::after {
 }
 
 .login-title {
-    font-family: var(--font-serif);
+    font-family: var(--font-display);
     font-size: 1.95rem;
     font-weight: 600;
     letter-spacing: -.025em;
@@ -775,7 +916,7 @@ body::after {
 }
 .brand-mark svg { width: 14px; height: 14px; }
 .brand-text {
-    font-family: var(--font-serif);
+    font-family: var(--font-display);
     font-size: 1.02rem;
     font-weight: 600;
     letter-spacing: -.015em;
@@ -969,7 +1110,7 @@ body::after {
 }
 .folder-heading { display: flex; align-items: baseline; gap: 10px; min-width: 0; }
 .current-heading {
-    font-family: var(--font-serif);
+    font-family: var(--font-display);
     font-size: 1.52rem;
     font-weight: 600;
     letter-spacing: -.02em;
@@ -1241,7 +1382,7 @@ body::after {
 }
 .empty-icon svg { width: 28px; height: 28px; }
 .empty-title {
-    font-family: var(--font-serif);
+    font-family: var(--font-display);
     font-size: 1.18rem;
     font-weight: 600;
     letter-spacing: -.015em;
@@ -1384,7 +1525,7 @@ body::after {
     animation: rise .28s var(--ease) both;
 }
 .modal-card h3 {
-    font-family: var(--font-serif);
+    font-family: var(--font-display);
     font-size: 1.26rem;
     font-weight: 600;
     letter-spacing: -.02em;
@@ -1577,7 +1718,7 @@ body::after {
 .quick-look-icon svg { width: 16px; height: 16px; stroke: currentColor; }
 .quick-look-title {
     display: block; max-width: 520px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
-    font-family: var(--font-serif);
+    font-family: var(--font-display);
     font-size: 1.05rem;
     font-weight: 600;
 }
@@ -1705,7 +1846,7 @@ body::after {
 }
 .gallery-title-box { display: flex; flex-direction: column; min-width: 0; }
 .gallery-active-title {
-    font-family: var(--font-serif);
+    font-family: var(--font-display);
     font-size: 1.05rem;
     font-weight: 600;
     overflow: hidden;
@@ -1955,120 +2096,140 @@ body::after {
 }
 
 /* ══════════════════════════════════════════════════════════════
-   ══  TERMINAL  ══  green phosphor / hacker CRT
+   ══  TERMINAL  ══  "Phosphor" — quiet green on black
+   Calm phosphor-on-ink: near-black ground, single green ink,
+   NO text glows, no neon shadows. Comfortable for long sessions.
    ══════════════════════════════════════════════════════════════ */
 [data-ui="terminal"] {
+    --font-display: var(--mono);
     --font: var(--mono);
-    --bg: #040705;
+    --bg: #070a08;
+    --bg-gradient: linear-gradient(180deg, #090d0a 0%, #070a08 48%, #060806 100%);
     --bg-blobs: none;
-    --veil: transparent;
 
-    --panel: rgba(6, 20, 12, .82);
-    --panel-2: rgba(4, 14, 9, .92);
-    --panel-solid: #061109;
-    --card: rgba(18, 224, 122, .05);
-    --card-hover: rgba(18, 224, 122, .11);
-    --well: rgba(18, 224, 122, .06);
+    --panel: rgba(9, 15, 11, .90);
+    --panel-2: rgba(7, 12, 9, .96);
+    --panel-solid: #0a0f0c;
+    --card: rgba(122, 224, 154, .045);
+    --card-hover: rgba(122, 224, 154, .09);
+    --well: rgba(122, 224, 154, .05);
 
-    --line: rgba(18, 224, 122, .34);
-    --line-soft: rgba(18, 224, 122, .16);
-    --edge: inset 0 0 0 1px rgba(18, 224, 122, .08);
+    --line: rgba(140, 241, 166, .22);
+    --line-soft: rgba(140, 241, 166, .10);
+    --edge: none;
 
-    --txt: #c8ffe0;
-    --txt-2: #5fe896;
-    --txt-3: #2f9a63;
+    --txt: #a8efc0;
+    --txt-2: #74c287;
+    --txt-3: #4c8a60;
 
-    --accent: #19f27a;
-    --accent-2: #0fd6c0;
-    --accent-soft: rgba(25, 242, 122, .13);
-    --accent-line: rgba(25, 242, 122, .48);
-    --on-accent: #01130a;
+    --accent: #3ff57f;
+    --accent-2: #a4f3ba;
+    --accent-soft: rgba(74, 222, 128, .11);
+    --accent-line: rgba(74, 222, 128, .35);
+    --on-accent: #071009;
 
-    --danger: #ff5f56;
-    --danger-soft: rgba(255, 95, 86, .14);
-    --warn: #ffbd2e;
+    --danger: #f87171;
+    --danger-soft: rgba(248, 113, 113, .13);
+    --warn: #fbbf24;
 
     --r-xs: 2px;
     --r-sm: 2px;
-    --r-md: 3px;
-    --r-lg: 4px;
-    --r-xl: 4px;
+    --r-md: 2px;
+    --r-lg: 3px;
+    --r-xl: 3px;
+    --r-full: 3px;
 
     --blur: 0px;
     --sat: 100%;
-    --shadow-1: 0 0 0 1px rgba(25, 242, 122, .10), 0 0 22px rgba(25, 242, 122, .10);
-    --shadow-2: 0 0 0 1px rgba(25, 242, 122, .14), 0 0 44px rgba(25, 242, 122, .16);
-}
+    --shadow-1: 0 1px 4px rgba(0, 0, 0, .5);
+    --shadow-2: 0 10px 34px rgba(0, 0, 0, .6);
 
-/* CRT scanlines + vignette replace the ambient colour field */
+    --veil: transparent;
+}
+/* Flat field with a faint top light; no blobs, no vignette tunnel */
 [data-ui="terminal"] body::before {
-    inset: 0;
-    filter: none;
     background:
-        repeating-linear-gradient(180deg, rgba(25, 242, 122, .045) 0 1px, transparent 1px 3px),
-        radial-gradient(120% 90% at 50% 0%, rgba(25, 242, 122, .07), transparent 60%),
-        radial-gradient(140% 120% at 50% 50%, transparent 55%, rgba(0, 0, 0, .6) 100%);
-    animation: none;
-    opacity: .9;
+        repeating-linear-gradient(180deg, rgba(140, 241, 166, .028) 0 1px, transparent 1px 3px),
+        radial-gradient(110% 70% at 50% 0%, rgba(74, 222, 128, .07), transparent 55%),
+        var(--bg);
 }
 [data-ui="terminal"] body::after {
-    width: 60vw; height: 60vw;
-    background: radial-gradient(circle, rgba(25, 242, 122, .10), transparent 60%);
+    /* keep the box alive but visually silent */
+    opacity: 0;
+    animation: none;
+    background: none;
 }
-[data-ui="terminal"] ::-webkit-scrollbar-thumb { background: rgba(25, 242, 122, .34); border-color: transparent; }
-[data-ui="terminal"] ::selection { background: rgba(25, 242, 122, .3); }
+[data-ui="terminal"] ::-webkit-scrollbar-thumb { background: rgba(140, 241, 166, .26); border-color: transparent; }
+[data-ui="terminal"] ::selection { background: rgba(74, 222, 128, .28); color: #eaffef; }
+[data-ui="terminal"] :focus-visible { outline-color: var(--accent); }
 
-/* Terminal text glow on the loudest elements */
-[data-ui="terminal"] .current-heading,
+/* Type stays calm: no uppercase shouting, but headings get the
+   classic CRT phosphor bleed (the ONE glow a real terminal has) */
 [data-ui="terminal"] .brand-text,
 [data-ui="terminal"] .login-title,
+[data-ui="terminal"] .current-heading,
 [data-ui="terminal"] .empty-title,
 [data-ui="terminal"] .modal-card h3 {
-    color: var(--accent);
-    -webkit-text-fill-color: currentColor;
-    background: none;
-    text-shadow: 0 0 10px rgba(25, 242, 122, .45);
-    letter-spacing: 0;
-    text-transform: uppercase;
+    letter-spacing: -.02em;
+    text-transform: none;
+    text-shadow: 0 0 10px rgba(63, 245, 127, .42), 0 0 26px rgba(63, 245, 127, .16);
 }
-[data-ui="terminal"] .current-heading { font-size: 1.24rem; }
-[data-ui="terminal"] .current-heading::before { content: "~/"; color: var(--txt-3); text-shadow: none; margin-right: 2px; }
+[data-ui="terminal"] .brand-text,
+[data-ui="terminal"] .login-title,
+[data-ui="terminal"] .current-heading { color: var(--accent); }
+[data-ui="terminal"] .current-heading { font-size: 1.22rem; }
+[data-ui="terminal"] .current-heading::before { content: "~/"; color: var(--txt-3); margin-right: 2px; }
 
-/* Blinking cursor after the wordmark */
-[data-ui="terminal"] .brand-caret { display: inline-block; animation: blink 1.05s steps(1) infinite; color: var(--accent); margin-left: 1px; }
-[data-ui="terminal"] .brand { text-transform: lowercase; letter-spacing: 0; }
+/* Blinking caret after the wordmark */
+[data-ui="terminal"] .brand-caret {
+    display: inline-block;
+    animation: blink 1.05s steps(1) infinite;
+    color: var(--accent);
+    margin-left: 1px;
+}
 
-/* Section labels get a shell comment prefix */
+/* Section labels keep a whisper of shell syntax */
 [data-ui="terminal"] .side-label::before,
-[data-ui="terminal"] .section-label::before { content: "// "; color: var(--accent); opacity: .7; }
+[data-ui="terminal"] .section-label::before { content: "// "; color: var(--accent); opacity: .65; }
 [data-ui="terminal"] .side-label,
-[data-ui="terminal"] .section-label { letter-spacing: .06em; text-transform: lowercase; font-size: .72rem; }
+[data-ui="terminal"] .section-label { letter-spacing: .04em; }
 
-/* Chips become bracketed flags */
-[data-ui="terminal"] .chip { border-radius: 0; padding: 5px 8px; text-transform: lowercase; }
-[data-ui="terminal"] .chip::before { content: "["; opacity: .5; margin-right: 5px; }
-[data-ui="terminal"] .chip::after { content: "]"; opacity: .5; margin-left: 5px; }
+/* Chips read as bracketed flags */
+[data-ui="terminal"] .chip { padding: 5px 8px; }
+[data-ui="terminal"] .chip::before { content: "["; opacity: .45; margin-right: 5px; }
+[data-ui="terminal"] .chip::after { content: "]"; opacity: .45; margin-left: 5px; }
 [data-ui="terminal"] .chip.active::before,
 [data-ui="terminal"] .chip.active::after { opacity: 1; }
 
-/* Buttons look like terminal actions */
-[data-ui="terminal"] .btn,
-[data-ui="terminal"] .card-btn,
-[data-ui="terminal"] .btn-action,
-[data-ui="terminal"] .dock-btn,
-[data-ui="terminal"] .gallery-btn,
-[data-ui="terminal"] .gallery-dropdown-toggle { text-transform: uppercase; letter-spacing: .06em; font-size: .74rem; border-radius: 0; }
+/* Quiet primary buttons: solid green, plain shadow */
 [data-ui="terminal"] .btn-primary,
 [data-ui="terminal"] .dock-btn-primary,
 [data-ui="terminal"] .inspector-action-btn.primary,
 [data-ui="terminal"] .login-btn {
     background: var(--accent);
     color: var(--on-accent);
-    box-shadow: 0 0 18px rgba(25, 242, 122, .45);
+    box-shadow: var(--shadow-1);
+    border-color: transparent;
 }
 [data-ui="terminal"] .btn-primary:hover,
 [data-ui="terminal"] .dock-btn-primary:hover,
-[data-ui="terminal"] .inspector-action-btn.primary:hover { box-shadow: 0 0 26px rgba(25, 242, 122, .7); }
+[data-ui="terminal"] .inspector-action-btn.primary:hover,
+[data-ui="terminal"] .login-btn:hover {
+    background: var(--accent-2);
+    box-shadow: var(--shadow-1);
+    transform: translateY(-1px);
+}
+[data-ui="terminal"] .btn-primary:active,
+[data-ui="terminal"] .dock-btn-primary:active,
+[data-ui="terminal"] .inspector-action-btn.primary:active,
+[data-ui="terminal"] .login-btn:active { transform: translateY(0); }
+
+/* Hover state: a hairline, no glow rings */
+[data-ui="terminal"] .file-grid-card:hover,
+[data-ui="terminal"] .file-grid-card.selected { box-shadow: 0 0 0 1px var(--accent-line); }
+[data-ui="terminal"] .card-type-icon { filter: none; }
+
+/* Cards and corners stay square */
 [data-ui="terminal"] .icon-btn,
 [data-ui="terminal"] .segment,
 [data-ui="terminal"] .appearance-switcher,
@@ -2076,123 +2237,330 @@ body::after {
 [data-ui="terminal"] .appearance-btn,
 [data-ui="terminal"] .field input,
 [data-ui="terminal"] .search input,
-[data-ui="terminal"] .menu-form input { border-radius: 0; }
-
-/* Card + tile treatment: dashed frames, corner ticks, ASCII-ish badges */
+[data-ui="terminal"] .menu-form input,
+[data-ui="terminal"] .menu,
+[data-ui="terminal"] .user-chip,
+[data-ui="terminal"] .action-dock,
+[data-ui="terminal"] .nav-badge,
+[data-ui="terminal"] .gallery-counter-pill,
 [data-ui="terminal"] .file-grid-card,
 [data-ui="terminal"] .folder-card,
 [data-ui="terminal"] .side-card,
 [data-ui="terminal"] .dropzone,
-[data-ui="terminal"] .files-table-wrap { border-radius: 0; }
+[data-ui="terminal"] .files-table-wrap,
+[data-ui="terminal"] .gallery-thumb-card,
+[data-ui="terminal"] .quick-look-pdf,
+[data-ui="terminal"] .preview-text-shell,
+[data-ui="terminal"] .gallery-split-pane { border-radius: 0; }
+
+/* Thumbnail wells get a dashed frame + faint diagonal weave */
 [data-ui="terminal"] .card-thumb-box {
     border: 1px dashed var(--line);
-    border-radius: 0;
-    background:
-        repeating-linear-gradient(45deg, rgba(25, 242, 122, .05) 0 6px, transparent 6px 12px);
+    background: repeating-linear-gradient(45deg, rgba(122, 224, 154, .04) 0 6px, transparent 6px 12px);
 }
-[data-ui="terminal"] .file-grid-card:hover { transform: none; box-shadow: 0 0 0 1px var(--accent), 0 0 26px rgba(25, 242, 122, .28); }
-[data-ui="terminal"] .file-grid-card.selected { box-shadow: 0 0 0 1px var(--accent), 0 0 30px rgba(25, 242, 122, .35); }
-[data-ui="terminal"] .file-grid-card::after {
-    content: "";
-    position: absolute;
-    top: 5px; right: 5px;
-    width: 6px; height: 6px;
-    border-top: 1px solid var(--accent);
-    border-right: 1px solid var(--accent);
-    opacity: .7;
-}
-[data-ui="terminal"] .card-type-icon { stroke: var(--accent); filter: drop-shadow(0 0 6px rgba(25, 242, 122, .5)); }
-[data-ui="terminal"] .nav-badge,
-[data-ui="terminal"] .gallery-counter-pill { border-radius: 0; }
+[data-ui="terminal"] .card-thumb-box svg { stroke: var(--accent-2); }
 
 /* Menus: prompt-style rows */
-[data-ui="terminal"] .menu { border-radius: 0; }
 [data-ui="terminal"] .menu-item::before { content: "> "; opacity: 0; color: var(--accent); transition: opacity var(--t-fast); }
 [data-ui="terminal"] .menu-item:hover::before,
 [data-ui="terminal"] .menu-item.active::before { opacity: 1; }
-[data-ui="terminal"] .menu-item { text-transform: lowercase; }
 
-/* Login becomes a terminal window */
+/* Login becomes a terminal window with a quiet title bar */
 [data-ui="terminal"] .login-card {
     max-width: 560px;
     padding: 62px 30px 34px;
     background: var(--panel-2);
     box-shadow: var(--shadow-2);
+    position: relative;
 }
 [data-ui="terminal"] .term-bar {
     display: flex; align-items: center; gap: 8px;
     position: absolute;
     top: 0; left: 0; right: 0;
     padding: 10px 14px;
-    background: rgba(25, 242, 122, .07);
+    background: rgba(140, 241, 166, .06);
     border-bottom: 1px solid var(--line);
 }
-[data-ui="terminal"] .login-card { position: relative; }
-[data-ui="terminal"] .term-dot { width: 9px; height: 9px; border-radius: 50%; background: rgba(25, 242, 122, .35); }
-[data-ui="terminal"] .term-dot:first-child { background: #ff5f56; }
-[data-ui="terminal"] .term-dot:nth-child(2) { background: #ffbd2e; }
+[data-ui="terminal"] .term-dot { width: 9px; height: 9px; border-radius: 50%; background: rgba(140, 241, 166, .28); }
+[data-ui="terminal"] .term-dot:first-child { background: #ff6b6b; }
+[data-ui="terminal"] .term-dot:nth-child(2) { background: #fbbf24; }
 [data-ui="terminal"] .term-dot:nth-child(3) { background: var(--accent); }
 [data-ui="terminal"] .term-path { margin-left: 8px; font-size: .72rem; color: var(--txt-3); }
-[data-ui="terminal"] .login-mark {
-    width: 46px; height: 46px;
-    border-radius: 0;
-    background: transparent;
-    border: 1px dashed var(--accent-line);
-    color: var(--accent);
-    box-shadow: none;
-}
-[data-ui="terminal"] .login-title { font-size: 1.5rem; }
-[data-ui="terminal"] .login-subtitle { text-align: left; margin-bottom: 22px; font-size: .78rem; }
-[data-ui="terminal"] .login-subtitle .prompt { display: inline; color: var(--accent); }
 [data-ui="terminal"] .card-corner-watermark,
 [data-ui="terminal"] .archival-meta-badge,
 [data-ui="terminal"] .vault-node-pill,
 [data-ui="terminal"] .field-crypto-spec,
 [data-ui="terminal"] .login-mark,
 [data-ui="terminal"] .daemon-status-pill,
-[data-ui="terminal"] .login-security-footer {
-    display: none !important;
-}
+[data-ui="terminal"] .login-security-footer { display: none !important; }
 [data-ui="terminal"] .login-header-bar {
     background: var(--panel-2);
     border-bottom: 1px solid var(--line);
 }
-[data-ui="terminal"] .login-card .field input { padding-left: 12px; font-family: var(--mono); }
+[data-ui="terminal"] .login-subtitle .prompt { display: inline; color: var(--accent); }
+[data-ui="terminal"] .login-card .field input { padding-left: 12px; }
 [data-ui="terminal"] .field-label {
     font-size: .82rem;
-    text-transform: lowercase;
     letter-spacing: 0;
     font-family: var(--mono);
 }
 [data-ui="terminal"] .field input:focus + .field-label,
 [data-ui="terminal"] .field input:not(:placeholder-shown) + .field-label {
     background: var(--panel-solid);
-    text-transform: uppercase;
-    letter-spacing: .1em;
 }
-[data-ui="terminal"] .login-btn { font-family: var(--mono); font-weight: 700; text-transform: uppercase; letter-spacing: .1em; }
-[data-ui="terminal"] .login-hint { text-align: left; }
+[data-ui="terminal"] .login-btn { font-weight: 700; letter-spacing: .06em; }
 
-/* Preview surfaces go flat black, text stays phosphor */
+/* Preview surfaces go flat ink, text stays phosphor */
 [data-ui="terminal"] .quick-look-card,
 [data-ui="terminal"] .gallery-overlay,
 [data-ui="terminal"] .quick-look-overlay { backdrop-filter: none; -webkit-backdrop-filter: none; }
-[data-ui="terminal"] .gallery-overlay { background: rgba(2, 8, 5, .97); }
-[data-ui="terminal"] .quick-look-overlay { background: rgba(2, 8, 5, .78); }
-[data-ui="terminal"] .quick-look-stage { background: rgba(3, 12, 8, .6); }
+[data-ui="terminal"] .gallery-overlay { background: rgba(4, 7, 5, .98); }
+[data-ui="terminal"] .quick-look-overlay { background: rgba(4, 7, 5, .80); }
+[data-ui="terminal"] .quick-look-stage { background: rgba(6, 10, 8, .6); }
 [data-ui="terminal"] .preview-code-container { color: var(--txt); }
-[data-ui="terminal"] .gallery-thumb-card,
-[data-ui="terminal"] .quick-look-pdf,
-[data-ui="terminal"] .preview-text-shell,
-[data-ui="terminal"] .gallery-split-pane { border-radius: 0; }
 
-/* Terminal keeps a monospace, uppercase topbar */
+/* Monospace mono-data touches */
 [data-ui="terminal"] .brand,
 [data-ui="terminal"] .user-chip,
 [data-ui="terminal"] .gallery-counter-pill,
 [data-ui="terminal"] .side-card-row strong,
 [data-ui="terminal"] .item-count { font-family: var(--mono); }
 [data-ui="terminal"] .item-count::before { content: "▸ "; color: var(--accent); }
-[data-ui="terminal"] .user-chip { border-radius: 0; }
-[data-ui="terminal"] .user-chip::before { content: "@"; opacity: .6; }
-[data-ui="terminal"] .action-dock { border-radius: 0; }
+[data-ui="terminal"] .user-chip::before { content: "@"; opacity: .55; }
+
+/* ══════════════════════════════════════════════════════════════
+   ══  CHOREOGRAPHY  ══  entrance stagger + tactile hovers
+   ══════════════════════════════════════════════════════════════ */
+.files-card-grid > :nth-child(1) { animation-delay: 0ms; }
+.files-card-grid > :nth-child(2) { animation-delay: 26ms; }
+.files-card-grid > :nth-child(3) { animation-delay: 52ms; }
+.files-card-grid > :nth-child(4) { animation-delay: 78ms; }
+.files-card-grid > :nth-child(5) { animation-delay: 104ms; }
+.files-card-grid > :nth-child(6) { animation-delay: 130ms; }
+.files-card-grid > :nth-child(7) { animation-delay: 156ms; }
+.files-card-grid > :nth-child(8) { animation-delay: 182ms; }
+.files-card-grid > :nth-child(9) { animation-delay: 208ms; }
+.files-card-grid > :nth-child(n+10) { animation-delay: 234ms; }
+.folders-grid > :nth-child(1) { animation-delay: 0ms; }
+.folders-grid > :nth-child(2) { animation-delay: 40ms; }
+.folders-grid > :nth-child(3) { animation-delay: 80ms; }
+.folders-grid > :nth-child(4) { animation-delay: 120ms; }
+.folders-grid > :nth-child(n+5) { animation-delay: 160ms; }
+
+/* Light mode gets the full tactile treatment */
+[data-mode="light"] .file-grid-card:hover,
+[data-mode="light"] .folder-card:hover {
+    transform: translateY(-3px);
+    box-shadow: 0 14px 34px rgba(44, 66, 56, .16), 0 4px 10px rgba(44, 66, 56, .08);
+    border-color: var(--accent-line);
+    transition-duration: .22s;
+}
+[data-mode="light"] .file-grid-card:active,
+[data-mode="light"] .folder-card:active { transform: translateY(-1px) scale(.99); }
+[data-mode="light"] .card-thumb-box { overflow: hidden; }
+[data-mode="light"] .card-thumb-box svg,
+[data-mode="light"] .card-thumb-box img { transition: transform .38s var(--ease); }
+[data-mode="light"] .file-grid-card:hover .card-thumb-box svg,
+[data-mode="light"] .file-grid-card:hover .card-thumb-box img { transform: scale(1.07); }
+[data-mode="light"] .dropzone:hover { transform: translateY(-1px); }
+[data-mode="light"] .btn:active, [data-mode="light"] .icon-btn:active { transform: scale(.97); }
+
+/* Login card gets one unhurried entrance over the oily field */
+[data-ui="liquid"][data-mode="light"] .login-card { animation: rise .6s var(--ease) both; }
+[data-ui="liquid"][data-mode="light"] .login-wrap .appearance-switcher,
+[data-ui="liquid"][data-mode="light"] .login-header-bar { animation: fade .5s var(--ease) both; animation-delay: .1s; }
+
+/* Glass login card over the oily field (light) */
+[data-ui="liquid"][data-mode="light"] .login-card {
+    background: rgba(255, 255, 255, .58);
+    backdrop-filter: blur(22px) saturate(1.3);
+    -webkit-backdrop-filter: blur(22px) saturate(1.3);
+}
+
+/* ══════════════════════════════════════════════════════════════
+   ══  FILM LAYERS  ══ (light mode)
+   One shared background owns the page: porcelain base → drifting
+   oily field → petal canvas. Chrome no longer sits on opaque
+   slabs: sidebar / inspector are transparent windows onto that
+   same background with a translucent colour film laid ON TOP, so
+   every layer stays visible at once. Rainbow rims are reserved
+   for small floating windows (login, menus, dock, modal) where
+   they read as accents, not architecture.
+   ══════════════════════════════════════════════════════════════ */
+
+/* Isolate panes so their film stays inside the pane
+   (above the oily field in paint order, below the pane content) */
+[data-ui="liquid"][data-mode="light"] .sidebar-pane,
+[data-ui="liquid"][data-mode="light"] .inspector-pane {
+    position: relative;
+    background: linear-gradient(170deg,
+        rgba(226, 148, 158, .12),
+        rgba(240, 186, 158, .10) 26%,
+        rgba(150, 205, 175, .12) 50%,
+        rgba(160, 200, 235, .12) 75%,
+        rgba(226, 148, 158, .10));
+    /* default attachment keeps the film glued to the pane box
+       while the folder list scrolls under it */
+    backdrop-filter: none;
+    -webkit-backdrop-filter: none;
+    border-color: rgba(40, 60, 50, .10);
+}
+
+[data-ui="liquid"][data-mode="light"] .inspector-pane {
+    background: linear-gradient(190deg,
+        rgba(226, 148, 158, .12),
+        rgba(160, 200, 235, .12) 30%,
+        rgba(150, 205, 175, .11) 58%,
+        rgba(240, 186, 158, .10) 82%,
+        rgba(226, 148, 158, .10));
+}
+
+/* Topbar: a soft translucent film strip, no slab, no rainbow */
+[data-ui="liquid"][data-mode="light"] .topbar {
+    position: relative;
+    isolation: isolate;
+    background: linear-gradient(180deg, rgba(246, 250, 248, .55), rgba(246, 250, 248, .18));
+    backdrop-filter: blur(15px) saturate(1.45);
+    -webkit-backdrop-filter: blur(15px) saturate(1.45);
+    border-color: rgba(40, 60, 50, .10);
+}
+[data-ui="liquid"][data-mode="light"] .topbar::before {
+    content: "";
+    position: absolute;
+    inset: 0;
+    z-index: -1;
+    pointer-events: none;
+    background: linear-gradient(90deg,
+        rgba(226, 148, 158, .07),
+        rgba(150, 205, 175, .07) 40%,
+        rgba(160, 200, 235, .08) 72%,
+        rgba(240, 186, 158, .06));
+}
+
+/* Small in-sidebar card: film glass, modest */
+[data-ui="liquid"][data-mode="light"] .side-card {
+    background: rgba(255, 255, 255, .34);
+    border: 1px solid rgba(40, 60, 50, .10);
+    backdrop-filter: blur(10px) saturate(1.35);
+    -webkit-backdrop-filter: blur(10px) saturate(1.35);
+    box-shadow: 0 8px 24px rgba(44, 66, 56, .07);
+}
+
+/* Sub-folder name cards: film glass too — no opaque white box,
+   the rainbow dye shows through the plate just like the films */
+[data-ui="liquid"][data-mode="light"] .folder-card {
+    background: rgba(255, 255, 255, .28);
+    border: 1px solid rgba(90, 70, 82, .13);
+    backdrop-filter: blur(14px) saturate(1.30);
+    -webkit-backdrop-filter: blur(14px) saturate(1.30);
+    box-shadow: 0 2px 10px rgba(70, 60, 68, .06);
+}
+[data-ui="liquid"][data-mode="light"] .folder-card:hover {
+    background: rgba(255, 255, 255, .42);
+    border-color: var(--accent-line);
+    box-shadow: 0 0 0 1px var(--accent-line), 0 10px 26px var(--accent-soft);
+}
+
+/* Floating windows keep the iridescent rim accents */
+[data-ui="liquid"][data-mode="light"] .action-dock,
+[data-ui="liquid"][data-mode="light"] .login-card,
+[data-ui="liquid"][data-mode="light"] .modal-card,
+[data-ui="liquid"][data-mode="light"] .menu,
+[data-ui="liquid"][data-mode="light"] .td-toast,
+[data-ui="liquid"][data-mode="light"] .quick-look-card {
+    border: 1px solid transparent;
+    background:
+        linear-gradient(var(--panel), var(--panel)) padding-box,
+        linear-gradient(125deg,
+            rgba(226, 148, 158, .44),
+            rgba(240, 190, 160, .30) 22%,
+            rgba(150, 205, 175, .40) 46%,
+            rgba(235, 220, 150, .26) 68%,
+            rgba(160, 200, 235, .40) 88%,
+            rgba(226, 148, 158, .44)) border-box;
+    backdrop-filter: blur(20px) saturate(1.5);
+    -webkit-backdrop-filter: blur(20px) saturate(1.5);
+    box-shadow:
+        0 18px 44px rgba(226, 148, 158, .10),
+        0 6px 16px rgba(130, 190, 160, .09),
+        inset 0 1px 0 rgba(255, 255, 255, .6);
+}
+
+/* Floating header bar on the login screen gets the same rim */
+[data-ui="liquid"][data-mode="light"] .login-header-bar {
+    border: 1px solid transparent;
+    background:
+        linear-gradient(rgba(248, 251, 249, .5), rgba(248, 251, 249, .5)) padding-box,
+        linear-gradient(125deg,
+            rgba(226, 148, 158, .40),
+            rgba(150, 205, 175, .38) 44%,
+            rgba(160, 200, 235, .40) 72%,
+            rgba(240, 190, 160, .34)) border-box;
+    backdrop-filter: blur(18px) saturate(1.5);
+    -webkit-backdrop-filter: blur(18px) saturate(1.5);
+    box-shadow: 0 10px 30px rgba(226, 148, 158, .09);
+}
+
+/* File + folder cards: softer white with a rose-tinted hover ring */
+[data-ui="liquid"][data-mode="light"] .file-grid-card,
+[data-ui="liquid"][data-mode="light"] .folder-card {
+    box-shadow: 0 2px 10px rgba(44, 66, 56, .07), 0 1px 3px rgba(226, 148, 158, .08);
+}
+[data-ui="liquid"][data-mode="light"] .file-grid-card:hover,
+[data-ui="liquid"][data-mode="light"] .folder-card:hover {
+    box-shadow:
+        0 0 0 1px rgba(226, 148, 158, .45),
+        0 14px 34px rgba(226, 148, 158, .13),
+        0 4px 10px rgba(130, 190, 160, .10);
+    border-color: rgba(226, 148, 158, .35);
+}
+
+/* Tinted focus echoes the film */
+[data-ui="liquid"][data-mode="light"] .field input:focus {
+    border-color: rgba(226, 148, 158, .5);
+    box-shadow: 0 0 0 3px rgba(226, 148, 158, .14);
+}
+[data-ui="liquid"][data-mode="light"] .search input:focus {
+    border-color: rgba(160, 200, 235, .55);
+    box-shadow: 0 0 0 3px rgba(160, 200, 235, .14);
+}
+
+/* ── Dark mode films: ONE shared ground, same doctrine as light ──
+   The black fog / petal / ribbon ground runs the full viewport;
+   sidebar, topbar and inspector are translucent black-crimson
+   films laid over it — never opaque slabs. Petals and ribbons
+   glow through every pane, not just the middle column. */
+[data-ui="liquid"][data-mode="dark"] .sidebar-pane,
+[data-ui="liquid"][data-mode="dark"] .inspector-pane {
+    background: linear-gradient(172deg,
+        rgba(15, 4, 8, .38),
+        rgba(26, 5, 12, .26) 28%,
+        rgba(12, 3, 7, .30) 56%,
+        rgba(24, 4, 10, .22) 82%,
+        rgba(15, 4, 8, .36));
+    backdrop-filter: none;
+    -webkit-backdrop-filter: none;
+    border-color: rgba(255, 110, 126, .13);
+}
+[data-ui="liquid"][data-mode="dark"] .topbar {
+    background: linear-gradient(180deg, rgba(10, 2, 5, .50), rgba(10, 2, 5, .14));
+    border-color: rgba(255, 110, 126, .11);
+}
+[data-ui="liquid"][data-mode="dark"] .side-card {
+    background: rgba(16, 4, 9, .40);
+    border-color: rgba(255, 110, 126, .12);
+    box-shadow: 0 8px 24px rgba(3, 0, 2, .35);
+}
+
+/* ── WebGL rainbow (light liquid mode, vendored engine) ──
+   Lives under the films and the petals; the CSS oily field
+   stands down while the shader owns the colour. */
+#liquid-backdrop {
+    position: fixed;
+    inset: 0;
+    z-index: 0;
+    pointer-events: none;
+    display: none;
+}
+[data-ui="liquid"][data-mode="light"][data-liquid-backdrop="on"] #liquid-backdrop { display: block; }
+[data-ui="liquid"][data-mode="light"][data-liquid-backdrop="on"] .ambient-field { display: none; }
